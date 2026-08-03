@@ -442,6 +442,7 @@ void URageVideoSettingsPanel::RefreshUpscalerModeOptions()
 	IF_VALID(DLSSFrameGenRow)
 		SupportedDLSSFrameGenModes = VideoSettings->GetSupportedDLSSFrameGenModes();
 		DLSSFrameGenRow->SetOptions(RageSettingsUI::BuildEnumOptionsTexts(SupportedDLSSFrameGenModes));
+		DLSSFrameGenRow->SetIsEnabled(VideoSettings->IsDLSSFrameGenSupported());
 	END_IF
 
 	IF_VALID(XeSSModeRow)
@@ -452,6 +453,7 @@ void URageVideoSettingsPanel::RefreshUpscalerModeOptions()
 	IF_VALID(XeSSFrameGenRow)
 		SupportedXeSSFrameGenModes = VideoSettings->GetSupportedXeSSFrameGenModes();
 		XeSSFrameGenRow->SetOptions(RageSettingsUI::BuildEnumOptionsTexts(SupportedXeSSFrameGenModes));
+		XeSSFrameGenRow->SetIsEnabled(VideoSettings->IsXeSSFrameGenSupported());
 	END_IF
 }
 

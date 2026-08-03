@@ -51,6 +51,18 @@ Add `RageSettings` to your module's dependencies to talk to settings from gamepl
 PublicDependencyModuleNames.AddRange(new string[] { "RageSettings", "RageSettingsUI" });
 ```
 
+**`RageSettingsUI` has no vendor-SDK dependency, by design — please keep it that way.** Every
+capability question it asks goes through `URageVideoSettings::Is*Supported()`, which is always
+declared and returns `false` when an SDK is compiled out. `RageSettings` owns every `#if WITH_*` in
+the plugin.
+
+Don't reach for those macros in the UI layer. They aren't visible there anyway — the vendor modules
+are *private* dependencies of `RageSettings`, so their defines don't propagate, and UE treats an
+undefined macro in an `#if` as error C4668 — and exporting them would be the wrong fix twice over:
+the common case is an SDK that *is* compiled in running on hardware that doesn't support it, which
+only a runtime query can answer; and the widget Blueprints in `Content/` can't be conditionally
+compiled, so build-flag-gated `BindWidget` properties would leave code and content out of step.
+
 ---
 
 ## Requirements
