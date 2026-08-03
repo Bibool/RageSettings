@@ -8,7 +8,7 @@
 #include "RageScalabilityCategory.h"
 #include "RageSelectionRow.h"
 #include "RageSettingsDeveloperSettings.h"
-#include "RageSettingsUITypes.h"
+#include "RageSettingsUIStatics.h"
 #include "RageVideoSettings.h"
 #include "RageSettingsSubsystem.h"
 #include "RageSettingsUIDeveloperSettings.h"

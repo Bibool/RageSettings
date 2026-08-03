@@ -5,7 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "RageSettingsUITypes.h"
+#include "RageSettingsUIStatics.h"
 #include "RageVideoSettingsPanel.h"
 #include "RageSettingsView.generated.h"
 

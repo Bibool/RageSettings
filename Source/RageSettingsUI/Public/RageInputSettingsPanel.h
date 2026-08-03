@@ -5,7 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "RageSettingsRowGeneratorPanelBase.h"
-#include "RageSettingsUITypes.h"
+#include "RageSettingsUIStatics.h"
 #include "RageInputSettingsPanel.generated.h"
 
 class URageInputSettings;

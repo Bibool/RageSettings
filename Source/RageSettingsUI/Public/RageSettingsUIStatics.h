@@ -7,7 +7,7 @@
 #include "RageMacros.h"
 #include "InputCoreTypes.h"
 #include "RageQualityPreset.h"
-#include "RageSettingsUITypes.generated.h"
+#include "RageSettingsUIStatics.generated.h"
 
 namespace RageSettingsUI
 {
