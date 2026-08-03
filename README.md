@@ -594,9 +594,6 @@ All under `Saved/Config/<Platform>/` at runtime; project defaults go in
 - **The generator never emits a combo row.** Enums become Selection rows unless you override the
   widget class per property. If you absolutely prefer combo rows for such values, you can go to the UI Settings and simply use `bEnumSettingsUsesComboRow`
 . The advantage of SelectionRows is that they use native FText and Combo uses FString parsed from FText.
-- **A conflicting rebind unbinds the other action** rather than swapping the two keys.
-- Slider clamps in a descriptor bound the widget, not the property. Clamp in a `SetPendingX()` if the
-  value must be safe from every path.
 - **The subsystem hard-fails as a unit.** If the `GameUserSettings` class isn't
   `URageVideoSettings`, no category initializes. Check the log for
   `URageSettingsSubsystem::Initialize` on startup — it says exactly this.
