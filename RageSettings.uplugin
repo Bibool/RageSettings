@@ -1,0 +1,60 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "Rage Settings",
+	"Description": "Modular scalable settings system supporting all major upscaling tech. Includes basic UI for set up.",
+	"Category": "Gameplay",
+	"CreatedBy": "Abdallah 'Bib' Boutrif",
+	"CreatedByURL": "",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "RageSettings",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "RageSettingsUI",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "RageSettingsShared",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "EnhancedInput",
+			"Enabled": true
+		},
+		{
+			"Name": "DLSS",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "StreamlineDLSSG",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "FSR",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "XeSS",
+			"Enabled": true,
+			"Optional": true
+		}
+	]
+}
