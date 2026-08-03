@@ -31,6 +31,10 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, meta = (DisplayName = "Get Rage Settings UI"))
 	static URageSettingsUIDeveloperSettings* Get();
 	
+	/* Should the enum settings use combo rows instead of selection row. */
+	UPROPERTY(Config, EditAnywhere, Category = "Rage|UI|Defaults")
+	bool bEnumSettingsUsesComboRow = false;
+	
 	UPROPERTY(Config, EditAnywhere, NoClear, Category = "Rage|UI|Defaults")
 	TSubclassOf<URageToggleRow> DefaultToggleRowClass = nullptr;
 

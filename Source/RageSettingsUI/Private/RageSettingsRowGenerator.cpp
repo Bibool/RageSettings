@@ -3,6 +3,7 @@
 
 #include "RageSettingsRowGenerator.h"
 
+#include "RageSettingsUIDeveloperSettings.h"
 #include "Algo/Reverse.h"
 #include "UObject/EnumProperty.h"
 #include "UObject/UnrealType.h"
@@ -43,12 +44,12 @@ RageSettingsUI::ERowKind RageSettingsUI::ResolveRowKind(const FProperty* Propert
 	
 	if (Property->IsA<FEnumProperty>())
 	{
-		return ERowKind::Selection;
+		return SETTINGS_UI->bEnumSettingsUsesComboRow ? ERowKind::Combo: ERowKind::Selection;
 	}
 	
 	if (const FByteProperty* ByteProperty = CastField<FByteProperty>(Property))
 	{
-		return IsValid(ByteProperty->Enum) ? ERowKind::Selection : ERowKind::Slider;
+		return IsValid(ByteProperty->Enum) ? SETTINGS_UI->bEnumSettingsUsesComboRow ? ERowKind::Combo: ERowKind::Selection : ERowKind::Slider;
 	}
 	
 	if (Property->IsA<FFloatProperty>() || Property->IsA<FDoubleProperty>() || Property->IsA<FIntProperty>() || Property->IsA<FInt64Property>())
