@@ -31,7 +31,7 @@ URageSettingsUIDeveloperSettings::URageSettingsUIDeveloperSettings()
 		DefaultComboRowClass = ComboFinder.Class;
 	}
 	
-	static ConstructorHelpers::FClassFinder<URageComboRow> CategoryFinder(TEXT("/RageSettings/W_Category_View.W_Category_View_C"));
+	static ConstructorHelpers::FClassFinder<URageRowBaseUserWidget> CategoryFinder(TEXT("/RageSettings/W_Category_View.W_Category_View_C"));
 	if (CategoryFinder.Succeeded())
 	{
 		DefaultCategoryWidgetClass = CategoryFinder.Class;
