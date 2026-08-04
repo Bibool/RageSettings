@@ -52,12 +52,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Rage|Settings|View")
 	void RequestClose();
 
+	/** Pulls every panel and the dirty/Apply affordances back in sync with the subsystem. Called
+	 *  automatically on construction and whenever this widget is made visible again. */
+	UFUNCTION(BlueprintCallable, Category = "Rage|Settings|View")
+	void RefreshAll();
+
 	/** Fires once it is actually safe to remove this widget. This view excepts to have its visibility or parentship managed (collapsed/removed) */
 	UPROPERTY(BlueprintAssignable, Category = "Rage|Settings|View")
 	FRageSettingsViewClosed ViewClosedDelegate;
 
 protected:
 	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget)) 
 	TObjectPtr<UWidgetSwitcher> CategorySwitcher = nullptr;
@@ -116,9 +122,14 @@ protected:
 private:
 	void InitializeView();
 
+	UUserWidget* GetPanelFor(ERageSettingsCategory Category) const;
 	UWidget* GetDirtyMarkerFor(ERageSettingsCategory Category) const;
+	void RefreshPanel(ERageSettingsCategory Category);
+	void RefreshDirtyMarkers();
 	void RefreshApplyButtonEnabled();
 	void CloseImmediately();
+
+	void HandleVisibilityChanged(ESlateVisibility NewVisibility);
 
 	UFUNCTION() 
 	void HandleGameTabClicked();

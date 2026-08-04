@@ -9,6 +9,7 @@
 #include "RageVideoSettingsPanel.h"
 #include "RageInputSettingsPanel.h"
 #include "RageUnsavedChangesModal.h"
+#include "RageSettingsPanelInterface.h"
 #include "Components/WidgetSwitcher.h"
 #include "Components/Button.h"
 #include "Components/Widget.h"
@@ -17,34 +18,15 @@
 
 void URageSettingsView::ShowCategory(ERageSettingsCategory Category)
 {
-	if (ActiveCategory == Category)
-	{
-		// Avoid unnecessary refresh
-		return;
-	}
-		
 	ActiveCategory = Category;
 
-	UUserWidget* TargetPanel = nullptr;
-	IRageSettingsPanelInterface* PanelInterface = nullptr;
-
-	switch (Category)
-	{
-		case ERageSettingsCategory::Game:  TargetPanel = GamePanel;  PanelInterface = GamePanel;  break;
-		case ERageSettingsCategory::Audio: TargetPanel = AudioPanel; PanelInterface = AudioPanel; break;
-		case ERageSettingsCategory::Video: TargetPanel = VideoPanel; PanelInterface = VideoPanel; break;
-		case ERageSettingsCategory::Input: TargetPanel = InputPanel; PanelInterface = InputPanel; break;
-	}
-	
-	if (IsValid(TargetPanel))
+	if (UUserWidget* TargetPanel = GetPanelFor(Category))
 	{
 		CategorySwitcher->SetActiveWidget(TargetPanel);
 	}
 
-	if (PanelInterface)
-	{
-		PanelInterface->RefreshFromSettings();
-	}
+	/* Refresh panel to force showing the current settings. */
+	RefreshPanel(Category);
 }
 
 void URageSettingsView::RequestClose()
@@ -54,8 +36,19 @@ void URageSettingsView::RequestClose()
 		UnsavedChangesModal->Open();
 		return;
 	}
-	
+
 	CloseImmediately();
+}
+
+void URageSettingsView::RefreshAll()
+{
+	RefreshPanel(ERageSettingsCategory::Game);
+	RefreshPanel(ERageSettingsCategory::Audio);
+	RefreshPanel(ERageSettingsCategory::Video);
+	RefreshPanel(ERageSettingsCategory::Input);
+
+	RefreshDirtyMarkers();
+	RefreshApplyButtonEnabled();
 }
 
 void URageSettingsView::NativeConstruct()
@@ -86,28 +79,45 @@ void URageSettingsView::NativeConstruct()
 		UnsavedChangesModal->DiscardAndCloseChosenDelegate.AddUniqueDynamic(this, &URageSettingsView::HandleModalDiscardAndClose);
 		UnsavedChangesModal->CancelChosenDelegate.AddUniqueDynamic(this, &URageSettingsView::HandleModalCancel);
 	}
-	
+
+	/* Necessary as if the view is not destroyed but rather hidden, it will not refresh itself. */
+	OnNativeVisibilityChanged.RemoveAll(this);
+	OnNativeVisibilityChanged.AddUObject(this, &URageSettingsView::HandleVisibilityChanged);
+
 	InitializeView();
+}
+
+void URageSettingsView::NativeDestruct()
+{
+	OnNativeVisibilityChanged.RemoveAll(this);
+
+	Super::NativeDestruct();
 }
 
 void URageSettingsView::InitializeView()
 {
 	GamePanel->InitializePanel(Subsystem);
-	GamePanel->RefreshFromSettings();
-	
-	AudioPanel->InitializePanel(Subsystem); 
-	AudioPanel->RefreshFromSettings();
-	
-	VideoPanel->InitializePanel(Subsystem); 
-	VideoPanel->RefreshFromSettings();
-	
-	InputPanel->InitializePanel(Subsystem); 
-	InputPanel->RefreshFromSettings();
+	AudioPanel->InitializePanel(Subsystem);
+	VideoPanel->InitializePanel(Subsystem);
+	InputPanel->InitializePanel(Subsystem);
 
 	Subsystem->AnyCategoryDirtyStateChangedDelegate.AddUniqueDynamic(this, &URageSettingsView::HandleAnyCategoryDirtyStateChanged);
 
 	ShowCategory(DefaultCategory);
-	RefreshApplyButtonEnabled();
+	RefreshAll();
+}
+
+UUserWidget* URageSettingsView::GetPanelFor(const ERageSettingsCategory Category) const
+{
+	switch (Category)
+	{
+		case ERageSettingsCategory::Game:  return GamePanel;
+		case ERageSettingsCategory::Audio: return AudioPanel;
+		case ERageSettingsCategory::Video: return VideoPanel;
+		case ERageSettingsCategory::Input: return InputPanel;
+	}
+
+	return nullptr;
 }
 
 UWidget* URageSettingsView::GetDirtyMarkerFor(const ERageSettingsCategory Category) const
@@ -115,9 +125,37 @@ UWidget* URageSettingsView::GetDirtyMarkerFor(const ERageSettingsCategory Catego
 	return DirtyMarkers[Category].Get();
 }
 
+void URageSettingsView::RefreshPanel(const ERageSettingsCategory Category)
+{
+	if (IRageSettingsPanelInterface* Panel = Cast<IRageSettingsPanelInterface>(GetPanelFor(Category)))
+	{
+		Panel->RefreshFromSettings();
+	}
+}
+
+void URageSettingsView::RefreshDirtyMarkers()
+{
+	for (const ERageSettingsCategory Category : { ERageSettingsCategory::Game, ERageSettingsCategory::Audio,
+		ERageSettingsCategory::Video, ERageSettingsCategory::Input })
+	{
+		if (UWidget* Marker = GetDirtyMarkerFor(Category))
+		{
+			Marker->SetVisibility(Subsystem->IsCategoryDirty(Category) ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+		}
+	}
+}
+
 void URageSettingsView::RefreshApplyButtonEnabled()
 {
 	ApplyButton->SetIsEnabled(Subsystem->HasAnyDirtySettings());
+}
+
+void URageSettingsView::HandleVisibilityChanged(const ESlateVisibility NewVisibility)
+{
+	if (NewVisibility != ESlateVisibility::Collapsed && NewVisibility != ESlateVisibility::Hidden)
+	{
+		RefreshAll();
+	}
 }
 
 void URageSettingsView::CloseImmediately()
@@ -153,8 +191,8 @@ void URageSettingsView::HandleApplyClicked()
 void URageSettingsView::HandleResetToDefaultsClicked()
 {
 	Subsystem->ResetCategoryToDefault(ActiveCategory);
-	
-	ShowCategory(ActiveCategory);
+
+	RefreshPanel(ActiveCategory);
 }
 
 void URageSettingsView::HandleCloseClicked()
@@ -164,8 +202,11 @@ void URageSettingsView::HandleCloseClicked()
 
 void URageSettingsView::HandleAnyCategoryDirtyStateChanged(ERageSettingsCategory Category, bool bIsDirty)
 {
-	GetDirtyMarkerFor(Category)->SetVisibility(bIsDirty ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
-	
+	if (UWidget* Marker = GetDirtyMarkerFor(Category))
+	{
+		Marker->SetVisibility(bIsDirty ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
+
 	RefreshApplyButtonEnabled();
 }
 
@@ -183,6 +224,9 @@ void URageSettingsView::HandleModalDiscardAndClose()
 	UnsavedChangesModal->Close();
 
 	Subsystem->RevertAllPendingChanges();
+
+	/* This should be handled via visibility changed now, but it's a safe operation to do. */
+	RefreshAll();
 
 	CloseImmediately();
 }
