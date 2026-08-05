@@ -5,6 +5,7 @@
 
 #include "GameplayTagContainer.h"
 #include "RageKeybindCategoryConfig.h"
+#include "RageRowOverrideData.h"
 #include "Engine/DeveloperSettings.h"
 #include "RageSettingsUIDeveloperSettings.generated.h"
 
@@ -51,7 +52,7 @@ public:
 	TSubclassOf<URageRowBaseUserWidget> DefaultCategoryWidgetClass = nullptr;
 
 	UPROPERTY(Config, EditAnywhere, Category = "Rage|UI")
-	TMap<FName, TSubclassOf<UUserWidget>> RowWidgetClassOverrides;
+	TMap<FName, FRageRowOverrideData> RowWidgetClassOverrides;
 	
 	/* Which Scalability settings to generate. */
 	UPROPERTY(Config, EditAnywhere, EditFixedSize, Category = "Rage|Video")

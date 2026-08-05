@@ -4,6 +4,8 @@
 #include "RageSettingsRowGeneratorPanelBase.h"
 
 #include "RageComboRow.h"
+#include "RageMacros.h"
+#include "RageRowOverrideObject.h"
 #include "RageSelectionRow.h"
 #include "Components/PanelWidget.h"
 #include "RageSettingsCategoryInterface.h"
@@ -11,7 +13,8 @@
 #include "RageSettingsUIDeveloperSettings.h"
 #include "RageSliderRow.h"
 #include "RageToggleRow.h"
-#include "UObject/EnumProperty.h"
+#include "Internationalization/StringTableCore.h"
+#include "Internationalization/StringTableRegistry.h"
 #include "UObject/UnrealType.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(RageSettingsRowGeneratorPanelBase)
@@ -21,9 +24,9 @@ namespace
 	UClass* ResolveRowWidgetClass(const FProperty* Property, const UClass* ExpectedBase, UClass* ProjectDefault)
 	{
 		const URageSettingsUIDeveloperSettings* UISettings = URageSettingsUIDeveloperSettings::Get();
-		if (const TSubclassOf<UUserWidget>* Override = UISettings->RowWidgetClassOverrides.Find(Property->GetFName()))
+		if (const FRageRowOverrideData* Override = UISettings->RowWidgetClassOverrides.Find(Property->GetFName()))
 		{
-			if (UClass* OverrideClass = Override->Get())
+			if (UClass* OverrideClass = Override->WidgetClass)
 			{
 				if (OverrideClass->IsChildOf(ExpectedBase))
 				{
@@ -36,6 +39,49 @@ namespace
 		}
 
 		return ProjectDefault;
+	}
+	
+	FText ResolveLabel(const FProperty* Property, const FRageSettingsRowDescriptor* Descriptor)
+	{
+		if (Descriptor && !Descriptor->Label.IsEmpty())
+		{
+			return Descriptor->Label;
+		}
+		
+		const URageSettingsUIDeveloperSettings* UISettings = URageSettingsUIDeveloperSettings::Get();
+		if (const FRageRowOverrideData* Override = UISettings->RowWidgetClassOverrides.Find(Property->GetFName()))
+		{
+			if (!Override->DesiredLabel.IsEmpty())
+			{
+				return Override->DesiredLabel;
+			}
+		}
+		
+		if (Property)
+		{
+			const FString PropertyStr = Property->GetFName().ToString();
+			const FStringTableConstPtr StringTable = FStringTableRegistry::Get().FindStringTable(TEXT("/RageSettings/ST_Settings.ST_Settings"));
+			if (StringTable.IsValid() && StringTable->FindEntry(PropertyStr))
+			{
+				return RAGE_LOC_Str(PropertyStr);
+			}
+			
+			return RageSettingsUI::DeriveDefaultLabel(Property);
+		}
+		
+		return FText::GetEmpty();
+	}
+	
+	void TryOverrideObjectWidgetManipulation(const FProperty* Property, URageRowBaseUserWidget* InWidget)
+	{
+		const URageSettingsUIDeveloperSettings* UISettings = URageSettingsUIDeveloperSettings::Get();
+		if (const FRageRowOverrideData* Override = UISettings->RowWidgetClassOverrides.Find(Property->GetFName()))
+		{
+			if (IsValid(Override->OverrideObject))
+			{
+				Override->OverrideObject->ManipulateGeneratedWidget(InWidget);
+			}
+		}
 	}
 }
 
@@ -64,7 +110,7 @@ void URageSettingsRowGeneratorPanelBase::BuildRows(UPanelWidget* Container, UObj
 		const FRageSettingsRowDescriptor* Descriptor = Descriptors.FindByPredicate(
 			[Property](const FRageSettingsRowDescriptor& Candidate) { return Candidate.PropertyName == Property->GetFName(); });
 
-		const FText Label = (Descriptor && !Descriptor->Label.IsEmpty()) ? Descriptor->Label : RageSettingsUI::DeriveDefaultLabel(Property);
+		const FText Label = ResolveLabel(Property, Descriptor);
 
 		switch (Kind)
 		{
@@ -76,6 +122,7 @@ void URageSettingsRowGeneratorPanelBase::BuildRows(UPanelWidget* Container, UObj
 					Row->SetLabel(Label);
 					Row->SetRowId(Property->GetFName());
 					Row->ValueChangedDelegate.AddUObject(this, &URageSettingsRowGeneratorPanelBase::HandleGeneratedToggleChanged);
+					TryOverrideObjectWidgetManipulation(Property, Row);
 					Container->AddChild(Row);
 				}
 				break;
@@ -93,6 +140,7 @@ void URageSettingsRowGeneratorPanelBase::BuildRows(UPanelWidget* Container, UObj
 						Row->SetDisplayFormat(Descriptor->SliderFormat);
 					}
 					Row->ValueChangedDelegate.AddUObject(this, &URageSettingsRowGeneratorPanelBase::HandleGeneratedSliderChanged);
+					TryOverrideObjectWidgetManipulation(Property, Row);
 					Container->AddChild(Row);
 				}
 				break;
@@ -117,6 +165,7 @@ void URageSettingsRowGeneratorPanelBase::BuildRows(UPanelWidget* Container, UObj
 					}
 					Row->SetOptions(Options);
 					Row->ValueChangedDelegate.AddUObject(this, &URageSettingsRowGeneratorPanelBase::HandleGeneratedComboChanged);
+					TryOverrideObjectWidgetManipulation(Property, Row);
 					Container->AddChild(Row);
 				}
 				break;
@@ -141,6 +190,7 @@ void URageSettingsRowGeneratorPanelBase::BuildRows(UPanelWidget* Container, UObj
 					}
 					Row->SetOptions(Options);
 					Row->ValueChangedDelegate.AddUObject(this, &URageSettingsRowGeneratorPanelBase::HandleGeneratedSelectionChanged);
+					TryOverrideObjectWidgetManipulation(Property, Row);
 					Container->AddChild(Row);
 				}
 			}

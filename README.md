@@ -564,7 +564,15 @@ Hand-authored labels resolve through a string table:
 ```
 
 `ST_Settings` ships with the plugin. Every user-facing text from RageSettingsUI is localized already.
-You will have to handle localization of your own UI/extra settings.
+You will have to handle localization of your own UI/extra settings. 
+The plugin attempts to localize labels in the following steps;
+1. Tries to get it from the RowDescriptor else
+2. Tries to get it from the override in the `URageSettingsUIDeveloperSettings` else
+3. Tries to get it directly from the string table by parsing the property name e.g. `bUseThruster` in ST_Settings else
+4. Falls back to parsing the property name directly as the label.
+
+Note; if all those fail, and you want your label localized, you can call SetLabel directly. There is also the OverrideObject
+that can directly manipulate the widget generated for the property, if set, it is called before it is added as a child.
 
 ---
 
