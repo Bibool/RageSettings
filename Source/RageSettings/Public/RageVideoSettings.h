@@ -4,8 +4,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "RageAntiAliasingMethod.h"
 #include "RageFeatureSupport.h"
 #include "RageHDRDisplayNits.h"
+#include "RageMSAASampleCount.h"
 #include "RageQualityPreset.h"
 #include "RageRayTracingSettings.h"
 #include "RageRHIType.h"
@@ -92,6 +94,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Rage|Video")
 	void SetPendingPreferredRHI(ERageRHIType NewRHI);
+
+	UFUNCTION(BlueprintCallable, Category = "Rage|Video")
+	void SetPendingAntiAliasingMethod(ERageAntiAliasingMethod NewMethod);
+
+	UFUNCTION(BlueprintCallable, Category = "Rage|Video")
+	void SetPendingMSAASampleCount(ERageMSAASampleCount NewCount);
 #pragma endregion
 
 #pragma region GETTERS
@@ -154,6 +162,15 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Rage|Video")
 	bool IsReflexSupported() const;
+	
+	UFUNCTION(BlueprintPure, Category = "Rage|Video")
+	TArray<ERageAntiAliasingMethod> GetAvailableAntiAliasingMethods() const;
+
+	UFUNCTION(BlueprintPure, Category = "Rage|Video")
+	bool IsAntiAliasingMethodSupported(ERageAntiAliasingMethod Method) const;
+	
+	UFUNCTION(BlueprintPure, Category = "Rage|Video")
+	bool IsAntiAliasingMethodOverriddenByUpscaler() const;
 	
 	UFUNCTION(BlueprintPure, Category = "Rage|Video")
 	ERageFeatureSupport QueryDLSSRRSupport() const;
@@ -243,6 +260,12 @@ public:
 
 	UPROPERTY(Config, BlueprintReadWrite, Category = "Rage|Video|Scalability")
 	int32 AntiAliasingQuality = 2;
+	
+	UPROPERTY(Config, BlueprintReadWrite, Category = "Rage|Video|Scalability")
+	ERageAntiAliasingMethod AntiAliasingMethod = ERageAntiAliasingMethod::TSR;
+
+	UPROPERTY(Config, BlueprintReadWrite, Category = "Rage|Video|Scalability")
+	ERageMSAASampleCount MSAASampleCount = ERageMSAASampleCount::x4;
 
 	UPROPERTY(Config, BlueprintReadWrite, Category = "Rage|Video|Scalability")
 	int32 ShadowQuality = 2;
@@ -298,6 +321,8 @@ private:
 	void ApplyRayTracingCVars(const FRageRayTracingSettings& Settings);
 	void ApplyUpscalerSettings(const FRageUpscalerSettings& Settings);
 	void ApplyPostProcessCVars();
+	void ApplyAntiAliasingCVars();
+	void ClampAntiAliasingMethodToSupported();
 	void ApplyPreferredRHI();
 	void ReconcilePreferredRHIWithActual();
 	void BroadcastDirtyIfChanged(bool bWasDirtyBefore);

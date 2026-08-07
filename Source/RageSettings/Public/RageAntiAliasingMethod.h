@@ -4,10 +4,12 @@
 #pragma once
 
 UENUM(BlueprintType)
-enum class ERageUpscalerMethod : uint8
+enum class ERageAntiAliasingMethod : uint8
 {
-	Off,
-	FSR,
-	DLSS,
-	XeSS
+	None,
+	FXAA,
+	TAA,
+	MSAA,
+	TSR,
+	SMAA
 };

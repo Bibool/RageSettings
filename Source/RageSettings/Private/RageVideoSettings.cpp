@@ -9,6 +9,7 @@
 #include "RageSettingsReflectionUtils.h"
 #include "RHI.h"
 #include "RenderUtils.h"
+#include "SceneUtils.h"
 #include "HAL/IConsoleManager.h"
 #include "Misc/Optional.h"
 #include "Containers/Ticker.h"
@@ -53,8 +54,9 @@ namespace RageVideoCVars
 	static const TCHAR* FilmGrain = TEXT("r.FilmGrain");
 	static const TCHAR* SceneColorFringe = TEXT("r.SceneColorFringeQuality");
 	static const TCHAR* Gamma = TEXT("r.Gamma");
-	static const TCHAR* TemporalUpscaler = TEXT("r.TemporalAA.Upscaler"); /*  0 = legacy TAAU, 1 = TSR */
 	static const TCHAR* ScreenPercentage = TEXT("r.ScreenPercentage");
+	static const TCHAR* AntiAliasingMethod = TEXT("r.AntiAliasingMethod");
+	static const TCHAR* MSAACount = TEXT("r.MSAACount");
 
 	/* Vendor plugin Cvars */
 	static const TCHAR* DLSSEnable = TEXT("r.NGX.DLSS.Enable");
@@ -95,6 +97,34 @@ namespace RageVideoCVars
 	}
 }
 
+
+namespace RageAntiAliasingMapping
+{
+	static int32 ToVendor(ERageAntiAliasingMethod Method)
+	{
+		switch (Method)
+		{
+			case ERageAntiAliasingMethod::None: return AAM_None;
+			case ERageAntiAliasingMethod::FXAA: return AAM_FXAA;
+			case ERageAntiAliasingMethod::TAA:  return AAM_TemporalAA;
+			case ERageAntiAliasingMethod::MSAA: return AAM_MSAA;
+			case ERageAntiAliasingMethod::TSR:  return AAM_TSR;
+			case ERageAntiAliasingMethod::SMAA: return AAM_SMAA;
+		}
+		return AAM_TSR;
+	}
+
+	static int32 ToSampleCount(ERageMSAASampleCount Count)
+	{
+		switch (Count)
+		{
+			case ERageMSAASampleCount::x2: return 2;
+			case ERageMSAASampleCount::x4: return 4;
+			case ERageMSAASampleCount::x8: return 8;
+		}
+		return 4;
+	}
+}
 
 /* Converts Rage <-> vendor enums. This is because each vendor (ofc) has different ordering or extra values, therefore we must never StaticCast between both. */
 namespace RageUpscalerMapping
@@ -286,11 +316,14 @@ void URageVideoSettings::ApplySettings()
 	ApplyRayTracingCVars(RayTracing);
 	ApplyUpscalerSettings(Upscaler);
 	ApplyPostProcessCVars();
+	ApplyAntiAliasingCVars();
 	ApplyPreferredRHI();
 	RageVideoCVars::SetFloat(RageVideoCVars::Gamma, Brightness);
 
 	const int32 DisplayNits = RageHDRDisplayNits::ToInt32(HDRDisplayNits);
 	EnableHDRDisplayOutput(bHDREnabled, DisplayNits);
+	
+	RageSettings::CopyObjectProperties(Pending, this);
 
 	DirtyStateChangedDelegate.Broadcast(ERageSettingsCategory::Video, false);
 }
@@ -407,6 +440,26 @@ void URageVideoSettings::SetPendingChromaticAberrationEnabled(bool bEnabled)
 {
 	const bool bWasDirty = IsDirty();
 	Pending->bChromaticAberrationEnabled = bEnabled;
+	BroadcastDirtyIfChanged(bWasDirty);
+}
+
+void URageVideoSettings::SetPendingAntiAliasingMethod(ERageAntiAliasingMethod NewMethod)
+{
+	if (!IsAntiAliasingMethodSupported(NewMethod))
+	{
+		S_LOG(Warning, "Rage Settings: refusing to stage an unsupported anti-aliasing method, the renderer would silently swap it out.");
+		return;
+	}
+
+	const bool bWasDirty = IsDirty();
+	Pending->AntiAliasingMethod = NewMethod;
+	BroadcastDirtyIfChanged(bWasDirty);
+}
+
+void URageVideoSettings::SetPendingMSAASampleCount(ERageMSAASampleCount NewCount)
+{
+	const bool bWasDirty = IsDirty();
+	Pending->MSAASampleCount = NewCount;
 	BroadcastDirtyIfChanged(bWasDirty);
 }
 
@@ -534,7 +587,7 @@ const FRageUpscalerSettings& URageVideoSettings::GetPendingUpscalerSettings() co
 
 TArray<ERageUpscalerMethod> URageVideoSettings::GetAvailableUpscalerMethods() const
 {
-	TArray<ERageUpscalerMethod> Methods = { ERageUpscalerMethod::Off, ERageUpscalerMethod::TAAU, ERageUpscalerMethod::TSR };
+	TArray<ERageUpscalerMethod> Methods = { ERageUpscalerMethod::Off };
 
 	if (IsFSRSupported())
 	{
@@ -743,6 +796,49 @@ TArray<ERageFrameGenerationMode> URageVideoSettings::GetSupportedXeSSFrameGenMod
 	return Result;
 }
 
+bool URageVideoSettings::IsAntiAliasingMethodSupported(ERageAntiAliasingMethod Method) const
+{
+	if (!GIsRHIInitialized)
+	{
+		return false;
+	}
+
+	switch (Method)
+	{
+		case ERageAntiAliasingMethod::None:
+		case ERageAntiAliasingMethod::FXAA:
+		case ERageAntiAliasingMethod::SMAA: return true;
+		case ERageAntiAliasingMethod::TAA:  return SupportsGen4TAA(GMaxRHIShaderPlatform);
+		case ERageAntiAliasingMethod::TSR:  return SupportsTSR(GMaxRHIShaderPlatform);
+		case ERageAntiAliasingMethod::MSAA: return IsForwardShadingEnabled(GMaxRHIShaderPlatform);
+	}
+
+	return false;
+}
+
+TArray<ERageAntiAliasingMethod> URageVideoSettings::GetAvailableAntiAliasingMethods() const
+{
+	TArray<ERageAntiAliasingMethod> Methods;
+	for (const ERageAntiAliasingMethod Candidate : { ERageAntiAliasingMethod::None, ERageAntiAliasingMethod::FXAA,
+		ERageAntiAliasingMethod::TAA, ERageAntiAliasingMethod::MSAA, ERageAntiAliasingMethod::TSR, ERageAntiAliasingMethod::SMAA })
+	{
+		if (IsAntiAliasingMethodSupported(Candidate))
+		{
+			Methods.Add(Candidate);
+		}
+	}
+
+	return Methods;
+}
+
+bool URageVideoSettings::IsAntiAliasingMethodOverriddenByUpscaler() const
+{
+	const ERageUpscalerMethod Method = IsValid(Pending) ? Pending->Upscaler.Method : Upscaler.Method;
+	return Method == ERageUpscalerMethod::DLSS
+		|| Method == ERageUpscalerMethod::FSR
+		|| Method == ERageUpscalerMethod::XeSS;
+}
+
 bool URageVideoSettings::IsRHISelectionSupported() const
 {
 	return RageRHI::IsSelectionSupported();
@@ -820,9 +916,8 @@ void URageVideoSettings::ApplyUpscalerSettings(const FRageUpscalerSettings& Sett
 	const bool bWantsDLSS = Settings.Method == ERageUpscalerMethod::DLSS;
 	const bool bWantsFSR = Settings.Method == ERageUpscalerMethod::FSR;
 	const bool bWantsXeSS = Settings.Method == ERageUpscalerMethod::XeSS;
-
+	
 	RageVideoCVars::SetBool(RageVideoCVars::FSREnabled, bWantsFSR);
-	RageVideoCVars::SetInt(RageVideoCVars::TemporalUpscaler, Settings.Method == ERageUpscalerMethod::TSR ? 1 : 0);
 
 	if (bWantsFSR)
 	{
@@ -903,6 +998,30 @@ void URageVideoSettings::ApplyPostProcessCVars()
 	RageVideoCVars::SetBool(RageVideoCVars::SceneColorFringe, bChromaticAberrationEnabled);
 }
 
+void URageVideoSettings::ApplyAntiAliasingCVars()
+{
+	ClampAntiAliasingMethodToSupported();
+
+	RageVideoCVars::SetInt(RageVideoCVars::AntiAliasingMethod, RageAntiAliasingMapping::ToVendor(AntiAliasingMethod));
+	RageVideoCVars::SetInt(RageVideoCVars::MSAACount, RageAntiAliasingMapping::ToSampleCount(MSAASampleCount));
+}
+
+void URageVideoSettings::ClampAntiAliasingMethodToSupported()
+{
+	if (IsAntiAliasingMethodSupported(AntiAliasingMethod))
+	{
+		return;
+	}
+	
+	S_LOG(Warning, "Rage Settings: persisted anti-aliasing method is not supported here, falling back to TSR.");
+
+	AntiAliasingMethod = ERageAntiAliasingMethod::TSR;
+	if (IsValid(Pending))
+	{
+		Pending->AntiAliasingMethod = ERageAntiAliasingMethod::TSR;
+	}
+}
+
 void URageVideoSettings::ApplyPreferredRHI()
 {
 	if (!RageRHI::IsSelectionSupported())
@@ -966,8 +1085,8 @@ void URageVideoSettings::ClampUpscalerMethodToSupported(FRageUpscalerSettings& S
 
 	if (!bMethodStillSupported)
 	{
-		S_LOG(Warning, "Rage Settings: persisted upscaler method is no longer supported on this hardware/platform, falling back to TSR.");
-		Settings.Method = ERageUpscalerMethod::TSR;
+		S_LOG(Warning, "Rage Settings: persisted upscaler method is no longer supported on this hardware/platform, turning upscaling off.");
+		Settings.Method = ERageUpscalerMethod::Off;
 	}
 }
 

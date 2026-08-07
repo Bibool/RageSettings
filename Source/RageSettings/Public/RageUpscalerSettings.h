@@ -17,7 +17,7 @@ struct FRageUpscalerSettings
 	GENERATED_BODY()
 
 	UPROPERTY(BlueprintReadWrite, Category = "Rage|Upscaling")
-	ERageUpscalerMethod Method = ERageUpscalerMethod::TSR;
+	ERageUpscalerMethod Method = ERageUpscalerMethod::Off;
 
 	UPROPERTY(BlueprintReadWrite, Category = "Rage|Upscaling")
 	ERageDLSSMode DLSSMode = ERageDLSSMode::Quality;

@@ -4,10 +4,9 @@
 #pragma once
 
 UENUM(BlueprintType)
-enum class ERageUpscalerMethod : uint8
+enum class ERageMSAASampleCount : uint8
 {
-	Off,
-	FSR,
-	DLSS,
-	XeSS
+	x2,
+	x4,
+	x8
 };

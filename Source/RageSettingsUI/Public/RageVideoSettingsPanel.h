@@ -22,6 +22,7 @@ struct FRageUpscalerSettings;
 enum class ERageUpscalerMethod : uint8;
 enum class ERageScalabilityCategory : uint8;
 enum class ERageRHIType : uint8;
+enum class ERageAntiAliasingMethod : uint8;
 enum class ERageDLSSMode : uint8;
 enum class ERageXeSSMode : uint8;
 enum class ERageFrameGenerationMode : uint8;
@@ -81,7 +82,13 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<URageSelectionRow> GraphicsAPIRow = nullptr;
 
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional)) 
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<URageSelectionRow> AntiAliasingMethodRow = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<URageSelectionRow> MSAASampleCountRow = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<URageSelectionRow> QualityPresetRow = nullptr;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional)) 
@@ -159,6 +166,8 @@ private:
 	void RefreshQualityPresetRow();
 	void RefreshResolutionOptions();
 	void RefreshGraphicsAPIOptions();
+	void RefreshAntiAliasingOptions();
+	void RefreshAntiAliasingRowsEnabled();
 	void RefreshUpscalerModeOptions();
 	void RefreshRayTracingSubRowsEnabled(bool bMasterEnabled);
 	void RefreshUpscalerOptionsVisibility(ERageUpscalerMethod Method);
@@ -176,6 +185,8 @@ private:
 	void HandleHDRChanged(FName RowId, FRageVariant bNewValue);
 	void HandleHDRNitsChanged(FName RowId, FRageVariant NewIndex);
 	void HandleGraphicsAPIChanged(FName RowId, FRageVariant NewIndex);
+	void HandleAntiAliasingMethodChanged(FName RowId, FRageVariant NewIndex);
+	void HandleMSAASampleCountChanged(FName RowId, FRageVariant NewIndex);
 	void HandleQualityPresetChanged(FName RowId, FRageVariant NewIndex);
 	void HandleScalabilityChanged(FName RowId, FRageVariant NewIndex);
 	void HandleRayTracingMasterChanged(FName RowId, FRageVariant bNewValue);
@@ -209,6 +220,7 @@ private:
 	TMap<FName, ERageScalabilityCategory> ScalabilityCategoryByRowId;
 	TArray<FIntPoint> CachedResolutions;
 	TArray<ERageRHIType> SelectableRHITypes;
+	TArray<ERageAntiAliasingMethod> SupportedAntiAliasingMethods;
 	TArray<ERageUpscalerMethod> SupportedUpscalerMethods;
 	TArray<ERageDLSSMode> SupportedDLSSModes;
 	TArray<ERageXeSSMode> SupportedXeSSModes;

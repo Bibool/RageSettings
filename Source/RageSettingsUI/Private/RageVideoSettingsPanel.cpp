@@ -141,6 +141,18 @@ void URageVideoSettingsPanel::NativeConstruct()
 		GraphicsAPIRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleGraphicsAPIChanged);
 	END_IF
 
+	IF_VALID(AntiAliasingMethodRow)
+		AntiAliasingMethodRow->SetLabel(RAGE_LOC("AntiAliasingMethod"));
+		AntiAliasingMethodRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleAntiAliasingMethodChanged);
+	END_IF
+
+	IF_VALID(MSAASampleCountRow)
+		MSAASampleCountRow->SetLabel(RAGE_LOC("MSAASampleCount"));
+		MSAASampleCountRow->SetOptions(RageSettingsUI::BuildEnumOptionsTexts<ERageMSAASampleCount>(
+			{ ERageMSAASampleCount::x2, ERageMSAASampleCount::x4, ERageMSAASampleCount::x8 }));
+		MSAASampleCountRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleMSAASampleCountChanged);
+	END_IF
+
 	IF_VALID(QualityPresetRow)
 		QualityPresetRow->SetLabel(RAGE_LOC("QualityPreset"));
 		QualityPresetRow->SetOptions(RageSettingsUI::BuildEnumOptionsTexts<ERageQualityPreset>(
@@ -267,6 +279,7 @@ void URageVideoSettingsPanel::InitializePanel(URageSettingsSubsystem* InSubsyste
 	VideoSettings = InSubsystem->GetVideoSettings();
 	RefreshResolutionOptions();
 	RefreshGraphicsAPIOptions();
+	RefreshAntiAliasingOptions();
 	RefreshUpscalerModeOptions();
 }
 
@@ -323,6 +336,16 @@ void URageVideoSettingsPanel::RefreshFromSettings()
 	IF_VALID(GraphicsAPIRow)
 		GraphicsAPIRow->SetSelectedIndex(FMath::Max(SelectableRHITypes.IndexOfByKey(Pending->PreferredRHI), 0));
 	END_IF
+
+	IF_VALID(AntiAliasingMethodRow)
+		AntiAliasingMethodRow->SetSelectedIndex(FMath::Max(SupportedAntiAliasingMethods.IndexOfByKey(Pending->AntiAliasingMethod), 0));
+	END_IF
+
+	IF_VALID(MSAASampleCountRow)
+		MSAASampleCountRow->SetSelectedIndex(static_cast<int32>(Pending->MSAASampleCount));
+	END_IF
+
+	RefreshAntiAliasingRowsEnabled();
 
 	RefreshQualityPresetRow();
 	RefreshScalabilityRows();
@@ -453,7 +476,35 @@ void URageVideoSettingsPanel::RefreshGraphicsAPIOptions()
 	IF_VALID(GraphicsAPIRow)
 		SelectableRHITypes = VideoSettings->GetSelectableRHITypes();
 		GraphicsAPIRow->SetOptions(RageSettingsUI::BuildEnumOptionsTexts(SelectableRHITypes));
-		GraphicsAPIRow->SetVisibility(SelectableRHITypes.Num() > 1 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+		GraphicsAPIRow->SetVisibility(SelectableRHITypes.Num() > 1 ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	END_IF
+}
+
+void URageVideoSettingsPanel::RefreshAntiAliasingOptions()
+{
+	IF_VALID(AntiAliasingMethodRow)
+		SupportedAntiAliasingMethods = VideoSettings->GetAvailableAntiAliasingMethods();
+		AntiAliasingMethodRow->SetOptions(RageSettingsUI::BuildEnumOptionsTexts(SupportedAntiAliasingMethods));
+	END_IF
+
+	IF_VALID(MSAASampleCountRow)
+		MSAASampleCountRow->SetVisibility(SupportedAntiAliasingMethods.Contains(ERageAntiAliasingMethod::MSAA)
+			? ESlateVisibility::SelfHitTestInvisible
+			: ESlateVisibility::Collapsed);
+	END_IF
+}
+
+void URageVideoSettingsPanel::RefreshAntiAliasingRowsEnabled()
+{
+	const URageVideoSettings* Pending = VideoSettings->GetPendingSettings();
+
+	IF_VALID(AntiAliasingMethodRow)
+		AntiAliasingMethodRow->SetRowEnabled(!VideoSettings->IsAntiAliasingMethodOverriddenByUpscaler(), RAGE_LOC("ControlledByUpscaler"));
+	END_IF
+
+	IF_VALID(MSAASampleCountRow)
+		/* No reason text - the method row that gates this one sits directly above it. */
+		MSAASampleCountRow->SetRowEnabled(Pending->AntiAliasingMethod == ERageAntiAliasingMethod::MSAA, FText::GetEmpty());
 	END_IF
 }
 
@@ -706,6 +757,20 @@ void URageVideoSettingsPanel::HandleGraphicsAPIChanged(FName RowId, FRageVariant
 	}
 }
 
+void URageVideoSettingsPanel::HandleAntiAliasingMethodChanged(FName RowId, FRageVariant NewIndex)
+{
+	if (SupportedAntiAliasingMethods.IsValidIndex(NewIndex.Get<int32>()))
+	{
+		VideoSettings->SetPendingAntiAliasingMethod(SupportedAntiAliasingMethods[NewIndex.Get<int32>()]);
+		RefreshAntiAliasingRowsEnabled(); // the sample count row only matters while MSAA is picked
+	}
+}
+
+void URageVideoSettingsPanel::HandleMSAASampleCountChanged(FName RowId, FRageVariant NewIndex)
+{
+	VideoSettings->SetPendingMSAASampleCount(static_cast<ERageMSAASampleCount>(NewIndex.Get<int32>()));
+}
+
 void URageVideoSettingsPanel::HandleQualityPresetChanged(FName RowId, FRageVariant NewIndex)
 {
 	VideoSettings->SetPendingQualityPreset(static_cast<ERageQualityPreset>(NewIndex.Get<int32>()));
@@ -761,6 +826,7 @@ void URageVideoSettingsPanel::HandleUpscalerMethodChanged(FName RowId, FRageVari
 		ModifyPendingUpscaler([NewMethod](FRageUpscalerSettings& S) { S.Method = NewMethod; });
 		RefreshUpscalerOptionsVisibility(NewMethod);
 		RefreshDLSSRayReconstructionRowEnabled(); // RR only matters while DLSS is the active method
+		RefreshAntiAliasingRowsEnabled(); // DLSS/FSR/XeSS take the AA method choice away
 	}
 }
 
