@@ -8,6 +8,8 @@
 #include "RageAudioSettingsPanel.h"
 #include "RageVideoSettingsPanel.h"
 #include "RageInputSettingsPanel.h"
+#include "RageConfirmModal.h"
+#include "RageMacros.h"
 #include "RageUnsavedChangesModal.h"
 #include "RageSettingsPanelInterface.h"
 #include "Components/WidgetSwitcher.h"
@@ -80,6 +82,13 @@ void URageSettingsView::NativeConstruct()
 		UnsavedChangesModal->CancelChosenDelegate.AddUniqueDynamic(this, &URageSettingsView::HandleModalCancel);
 	}
 
+	if (IsValid(RestartRequiredModal))
+	{
+		RestartRequiredModal->SetMessage(RAGE_LOC("RestartRequired"));
+		RestartRequiredModal->ConfirmChosenDelegate.AddUniqueDynamic(this, &URageSettingsView::HandleRestartConfirmed);
+		RestartRequiredModal->CancelChosenDelegate.AddUniqueDynamic(this, &URageSettingsView::HandleRestartDeclined);
+	}
+
 	/* Necessary as if the view is not destroyed but rather hidden, it will not refresh itself. */
 	OnNativeVisibilityChanged.RemoveAll(this);
 	OnNativeVisibilityChanged.AddUObject(this, &URageSettingsView::HandleVisibilityChanged);
@@ -102,6 +111,7 @@ void URageSettingsView::InitializeView()
 	InputPanel->InitializePanel(Subsystem);
 
 	Subsystem->AnyCategoryDirtyStateChangedDelegate.AddUniqueDynamic(this, &URageSettingsView::HandleAnyCategoryDirtyStateChanged);
+	Subsystem->RestartRequirementEvaluatedDelegate.AddUniqueDynamic(this, &URageSettingsView::HandleRestartRequirementEvaluated);
 
 	ShowCategory(DefaultCategory);
 	RefreshAll();
@@ -185,11 +195,15 @@ void URageSettingsView::HandleInputTabClicked()
 
 void URageSettingsView::HandleApplyClicked()
 {
+	bCloseViewAfterRestartPrompt = false;
+	
 	Subsystem->ApplyAndSaveAllDirtySettings();
 }
 
 void URageSettingsView::HandleResetToDefaultsClicked()
 {
+	bCloseViewAfterRestartPrompt = false;
+
 	Subsystem->ResetCategoryToDefault(ActiveCategory);
 
 	RefreshPanel(ActiveCategory);
@@ -213,10 +227,10 @@ void URageSettingsView::HandleAnyCategoryDirtyStateChanged(ERageSettingsCategory
 void URageSettingsView::HandleModalApplyAndClose()
 {
 	UnsavedChangesModal->Close();
+	
+	bCloseViewAfterRestartPrompt = true;
 
 	Subsystem->ApplyAndSaveAllDirtySettings();
-
-	CloseImmediately();
 }
 
 void URageSettingsView::HandleModalDiscardAndClose()
@@ -234,4 +248,40 @@ void URageSettingsView::HandleModalDiscardAndClose()
 void URageSettingsView::HandleModalCancel()
 {
 	UnsavedChangesModal->Close();
+}
+
+void URageSettingsView::HandleRestartRequirementEvaluated(bool bRestartRequired)
+{
+	if (bRestartRequired && IsValid(RestartRequiredModal))
+	{
+		RestartRequiredModal->Open();
+		return;
+	}
+	
+	if (bCloseViewAfterRestartPrompt)
+	{
+		bCloseViewAfterRestartPrompt = false;
+		CloseImmediately();
+	}
+}
+
+void URageSettingsView::HandleRestartConfirmed()
+{
+	RestartRequiredModal->Close();
+
+	if (!Subsystem->RestartGame())
+	{
+		HandleRestartDeclined();
+	}
+}
+
+void URageSettingsView::HandleRestartDeclined()
+{
+	RestartRequiredModal->Close();
+
+	if (bCloseViewAfterRestartPrompt)
+	{
+		bCloseViewAfterRestartPrompt = false;
+		CloseImmediately();
+	}
 }

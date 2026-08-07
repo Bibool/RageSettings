@@ -19,28 +19,41 @@ class RAGESETTINGSUI_API URageRowBaseUserWidget : public UUserWidget
 	GENERATED_BODY()
 	
 public:
-	UFUNCTION(BlueprintCallable, Category = "Rage|UI") 
+	UFUNCTION(BlueprintCallable, Category = "Rage|UI")
 	void SetLabel(const FText& NewLabel);
-	
+
 	UFUNCTION(BlueprintCallable, Category = "Rage|UI")
 	void SetRowId(FName NewRowId);
-	
-	UFUNCTION(BlueprintPure, Category = "Rage|UI") 
+
+	UFUNCTION(BlueprintPure, Category = "Rage|UI")
 	FName GetRowId() const;
 	
+	UFUNCTION(BlueprintCallable, Category = "Rage|UI")
+	void SetRowEnabled(bool bEnabled, const FText& InDisabledReason);
+
+	UFUNCTION(BlueprintPure, Category = "Rage|UI")
+	const FText& GetDisabledReason() const { return DisabledReason; }
+
 	FRageValueChanged ValueChangedDelegate;
 
 protected:
 	virtual void NativePreConstruct() override;
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rage|UI")
 	FName RowId = NAME_None;
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rage|UI")
 	FText LabelText = FText::GetEmpty();
 	
+	UPROPERTY(EditDefaultsOnly, Category = "Rage|UI")
+	FText DisabledReasonFormat = FText::FromString(TEXT("{0} ({1})"));
+
 private:
+	void RefreshLabel();
+
 	UPROPERTY(Transient, BlueprintReadOnly, meta=(BindWidget, AllowPrivateAccess="true"))
 	TObjectPtr<UTextBlock> Label = nullptr;
+
+	FText DisabledReason = FText::GetEmpty();
 
 };

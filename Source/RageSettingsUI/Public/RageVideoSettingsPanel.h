@@ -21,6 +21,7 @@ struct FRageRayTracingSettings;
 struct FRageUpscalerSettings;
 enum class ERageUpscalerMethod : uint8;
 enum class ERageScalabilityCategory : uint8;
+enum class ERageRHIType : uint8;
 enum class ERageDLSSMode : uint8;
 enum class ERageXeSSMode : uint8;
 enum class ERageFrameGenerationMode : uint8;
@@ -74,8 +75,11 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional)) 
 	TObjectPtr<URageToggleRow> HDRRow = nullptr;
 	
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional)) 
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<URageSelectionRow> HDRNitsRow = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<URageSelectionRow> GraphicsAPIRow = nullptr;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional)) 
 	TObjectPtr<URageSelectionRow> QualityPresetRow = nullptr;
@@ -154,6 +158,7 @@ private:
 	void RefreshScalabilityRows();
 	void RefreshQualityPresetRow();
 	void RefreshResolutionOptions();
+	void RefreshGraphicsAPIOptions();
 	void RefreshUpscalerModeOptions();
 	void RefreshRayTracingSubRowsEnabled(bool bMasterEnabled);
 	void RefreshUpscalerOptionsVisibility(ERageUpscalerMethod Method);
@@ -170,6 +175,7 @@ private:
 	void HandleFieldOfViewChanged(FName RowId, FRageVariant NewValue);
 	void HandleHDRChanged(FName RowId, FRageVariant bNewValue);
 	void HandleHDRNitsChanged(FName RowId, FRageVariant NewIndex);
+	void HandleGraphicsAPIChanged(FName RowId, FRageVariant NewIndex);
 	void HandleQualityPresetChanged(FName RowId, FRageVariant NewIndex);
 	void HandleScalabilityChanged(FName RowId, FRageVariant NewIndex);
 	void HandleRayTracingMasterChanged(FName RowId, FRageVariant bNewValue);
@@ -202,6 +208,7 @@ private:
 	
 	TMap<FName, ERageScalabilityCategory> ScalabilityCategoryByRowId;
 	TArray<FIntPoint> CachedResolutions;
+	TArray<ERageRHIType> SelectableRHITypes;
 	TArray<ERageUpscalerMethod> SupportedUpscalerMethods;
 	TArray<ERageDLSSMode> SupportedDLSSModes;
 	TArray<ERageXeSSMode> SupportedXeSSModes;

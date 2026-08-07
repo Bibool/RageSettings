@@ -4,6 +4,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Containers/Ticker.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "RageSettingsCategoryInterface.h"
 #include "RageSettingsSubsystem.generated.h"
@@ -76,17 +77,30 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Rage|Settings")
 	bool IsCategoryDirty(ERageSettingsCategory Category) const;
 	
+	UFUNCTION(BlueprintPure, Category = "Rage|Settings")
+	bool IsRestartRequired() const;
+	
+	UFUNCTION(BlueprintCallable, Category = "Rage|Settings")
+	bool RestartGame();
+	
 	UPROPERTY(BlueprintAssignable, Category = "Rage|Delegates")
 	FRageCategoryDirtyStateChanged AnyCategoryDirtyStateChangedDelegate;
 
 	UPROPERTY(BlueprintAssignable, Category = "Rage|Delegates")
 	FRageCategoryApplied CategoryAppliedDelegate;
+	
+	UPROPERTY(BlueprintAssignable, Category = "Rage|Delegates")
+	FRageRestartRequirementEvaluated RestartRequirementEvaluatedDelegate;
 
 private:
 	UFUNCTION()
 	void HandleCategoryDirtyStateChanged(ERageSettingsCategory Category, bool bIsDirty);
 	
+	void DeferredEvaluateRestartRequirement();
+
 	IRageSettingsCategoryInterface* ResolveCategory(ERageSettingsCategory Category) const;
+
+	FTSTicker::FDelegateHandle RestartCheckTickerHandle;
 	
 	UPROPERTY() 
 	TObjectPtr<URageVideoSettings> VideoSettings = nullptr;
@@ -101,6 +115,5 @@ private:
 	TObjectPtr<URageInputSettings> InputSettings = nullptr;
 	
 	TArray<TScriptInterface<IRageSettingsCategoryInterface>> AllCategories;
-
-
+	
 };

@@ -9,6 +9,7 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FRageCategoryDirtyStateChanged, ERageSettingsCategory, Category, bool, bDirty);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FRageCategoryApplied, ERageSettingsCategory, Category);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FRageRestartRequirementEvaluated, bool, bRestartRequired);
 
 UINTERFACE(MinimalAPI, Blueprintable)
 class URageSettingsCategoryInterface : public UInterface

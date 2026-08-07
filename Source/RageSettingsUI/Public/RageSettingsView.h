@@ -14,6 +14,7 @@ class URageGameSettingsPanel;
 class URageAudioSettingsPanel;
 class URageVideoSettingsPanel;
 class URageInputSettingsPanel;
+class URageConfirmModal;
 class URageUnsavedChangesModal;
 class UWidgetSwitcher;
 class UButton;
@@ -113,8 +114,12 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget)) 
 	TObjectPtr<UButton> CloseButton = nullptr;
 
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional)) 
+	// TODO Improve modals, this is wasteful to have two.
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<URageUnsavedChangesModal> UnsavedChangesModal = nullptr;
+	
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<URageConfirmModal> RestartRequiredModal = nullptr;
 	
 	UPROPERTY(EditDefaultsOnly)
 	ERageSettingsCategory DefaultCategory = ERageSettingsCategory::Video;
@@ -128,6 +133,7 @@ private:
 	void RefreshDirtyMarkers();
 	void RefreshApplyButtonEnabled();
 	void CloseImmediately();
+
 
 	void HandleVisibilityChanged(ESlateVisibility NewVisibility);
 
@@ -161,13 +167,24 @@ private:
 	UFUNCTION() 
 	void HandleModalDiscardAndClose();
 	
-	UFUNCTION() 
+	UFUNCTION()
 	void HandleModalCancel();
-	
+
+	UFUNCTION()
+	void HandleRestartRequirementEvaluated(bool bRestartRequired);
+
+	UFUNCTION()
+	void HandleRestartConfirmed();
+
+	UFUNCTION()
+	void HandleRestartDeclined();
+
 	UPROPERTY()
 	TObjectPtr<URageSettingsSubsystem> Subsystem = nullptr;
-	
+
 	TMap<ERageSettingsCategory, TWeakObjectPtr<UWidget>> DirtyMarkers;
 
 	ERageSettingsCategory ActiveCategory = ERageSettingsCategory::Video;
+
+	bool bCloseViewAfterRestartPrompt = false;
 };

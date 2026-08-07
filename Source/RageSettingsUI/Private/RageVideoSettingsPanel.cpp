@@ -25,6 +25,11 @@
 
 namespace
 {
+	FText ResolveSupportReason(ERageFeatureSupport Support)
+	{
+		return RageSettingsUI::ResolveLocTextForEnum(Support);
+	}
+
 	constexpr float AspectRatioTolerance = 0.03f;
 
 	FIntPoint ResolveAspectRatio(const FIntPoint& Resolution)
@@ -131,6 +136,11 @@ void URageVideoSettingsPanel::NativeConstruct()
 		HDRNitsRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleHDRNitsChanged);
 	END_IF
 	
+	IF_VALID(GraphicsAPIRow)
+		GraphicsAPIRow->SetLabel(RAGE_LOC("GraphicsAPI"));
+		GraphicsAPIRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleGraphicsAPIChanged);
+	END_IF
+
 	IF_VALID(QualityPresetRow)
 		QualityPresetRow->SetLabel(RAGE_LOC("QualityPreset"));
 		QualityPresetRow->SetOptions(RageSettingsUI::BuildEnumOptionsTexts<ERageQualityPreset>(
@@ -256,6 +266,7 @@ void URageVideoSettingsPanel::InitializePanel(URageSettingsSubsystem* InSubsyste
 {
 	VideoSettings = InSubsystem->GetVideoSettings();
 	RefreshResolutionOptions();
+	RefreshGraphicsAPIOptions();
 	RefreshUpscalerModeOptions();
 }
 
@@ -296,15 +307,21 @@ void URageVideoSettingsPanel::RefreshFromSettings()
 	IF_VALID(FieldOfViewRow)
 		FieldOfViewRow->SetValue(Pending->FieldOfView);
 	END_IF
+	
+	const bool bHDRSupported = VideoSettings->IsHDRSupported();
 
 	IF_VALID(HDRRow)
 		HDRRow->SetValue(Pending->bHDREnabled);
-		HDRRow->SetIsEnabled(VideoSettings->IsHDRSupported());
+		HDRRow->SetRowEnabled(bHDRSupported, RAGE_LOC("RequiresWindowsHDR"));
 	END_IF
 
 	IF_VALID(HDRNitsRow)
 		HDRNitsRow->SetSelectedIndex(static_cast<int32>(Pending->HDRDisplayNits));
-		HDRNitsRow->SetIsEnabled(VideoSettings->IsHDRSupported() && Pending->bHDREnabled);
+		HDRNitsRow->SetRowEnabled(bHDRSupported && Pending->bHDREnabled, FText::GetEmpty());
+	END_IF
+
+	IF_VALID(GraphicsAPIRow)
+		GraphicsAPIRow->SetSelectedIndex(FMath::Max(SelectableRHITypes.IndexOfByKey(Pending->PreferredRHI), 0));
 	END_IF
 
 	RefreshQualityPresetRow();
@@ -315,7 +332,10 @@ void URageVideoSettingsPanel::RefreshFromSettings()
 
 	IF_VALID(RayTracingMasterRow)
 		RayTracingMasterRow->SetValue(RT.bEnabled);
-		RayTracingMasterRow->SetIsEnabled(bRayTracingSupported);
+		RayTracingMasterRow->SetRowEnabled(bRayTracingSupported,
+			ResolveSupportReason(VideoSettings->GetActiveRHIType() == ERageRHIType::DirectX11
+				? ERageFeatureSupport::NotSupportedByRHI
+				: ERageFeatureSupport::IncompatibleHardware));
 	END_IF
 	
 	IF_VALID(RTShadowsRow)
@@ -381,11 +401,12 @@ void URageVideoSettingsPanel::RefreshFromSettings()
 	
 	IF_VALID(ReflexModeRow)
 		ReflexModeRow->SetSelectedIndex(static_cast<int32>(Up.ReflexMode));
+		ReflexModeRow->SetRowEnabled(VideoSettings->IsReflexSupported(), ResolveSupportReason(VideoSettings->QueryReflexSupport()));
 	END_IF
 
 	IF_VALID(XeLLRow)
 		XeLLRow->SetValue(Up.bXeLLEnabled);
-		XeLLRow->SetIsEnabled(VideoSettings->IsXeLLSupported());
+		XeLLRow->SetRowEnabled(VideoSettings->IsXeLLSupported(), ResolveSupportReason(ERageFeatureSupport::NotSupported));
 	END_IF
 	
 	RefreshUpscalerOptionsVisibility(Up.Method);
@@ -427,8 +448,19 @@ void URageVideoSettingsPanel::RefreshResolutionOptions()
 	ResolutionRow->SetOptions(Options);
 }
 
+void URageVideoSettingsPanel::RefreshGraphicsAPIOptions()
+{
+	IF_VALID(GraphicsAPIRow)
+		SelectableRHITypes = VideoSettings->GetSelectableRHITypes();
+		GraphicsAPIRow->SetOptions(RageSettingsUI::BuildEnumOptionsTexts(SelectableRHITypes));
+		GraphicsAPIRow->SetVisibility(SelectableRHITypes.Num() > 1 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	END_IF
+}
+
 void URageVideoSettingsPanel::RefreshUpscalerModeOptions()
 {
+	VideoSettings->ClampUpscalerToSupported();
+
 	IF_VALID(UpscalerMethodRow)
 		SupportedUpscalerMethods = VideoSettings->GetAvailableUpscalerMethods();
 		UpscalerMethodRow->SetOptions(RageSettingsUI::BuildEnumOptionsTexts(SupportedUpscalerMethods));
@@ -442,7 +474,8 @@ void URageVideoSettingsPanel::RefreshUpscalerModeOptions()
 	IF_VALID(DLSSFrameGenRow)
 		SupportedDLSSFrameGenModes = VideoSettings->GetSupportedDLSSFrameGenModes();
 		DLSSFrameGenRow->SetOptions(RageSettingsUI::BuildEnumOptionsTexts(SupportedDLSSFrameGenModes));
-		DLSSFrameGenRow->SetIsEnabled(VideoSettings->IsDLSSFrameGenSupported());
+		DLSSFrameGenRow->SetRowEnabled(VideoSettings->IsDLSSFrameGenSupported(),
+			ResolveSupportReason(VideoSettings->QueryDLSSFrameGenSupport()));
 	END_IF
 
 	IF_VALID(XeSSModeRow)
@@ -453,7 +486,7 @@ void URageVideoSettingsPanel::RefreshUpscalerModeOptions()
 	IF_VALID(XeSSFrameGenRow)
 		SupportedXeSSFrameGenModes = VideoSettings->GetSupportedXeSSFrameGenModes();
 		XeSSFrameGenRow->SetOptions(RageSettingsUI::BuildEnumOptionsTexts(SupportedXeSSFrameGenModes));
-		XeSSFrameGenRow->SetIsEnabled(VideoSettings->IsXeSSFrameGenSupported());
+		XeSSFrameGenRow->SetRowEnabled(VideoSettings->IsXeSSFrameGenSupported(), ResolveSupportReason(ERageFeatureSupport::NotSupported));
 	END_IF
 }
 
@@ -577,7 +610,25 @@ void URageVideoSettingsPanel::RefreshDLSSRayReconstructionRowEnabled()
 		&& bRayTracingActive
 		&& VideoSettings->IsDLSSRRSupported();
 	
-	DLSSRayReconstructionRow->SetIsEnabled(bCanUseRR);
+	FText Reason = FText::GetEmpty();
+	if (!bCanUseRR)
+	{
+		const ERageFeatureSupport RRSupport = VideoSettings->QueryDLSSRRSupport();
+		if (RRSupport != ERageFeatureSupport::Supported)
+		{
+			Reason = ResolveSupportReason(RRSupport);
+		}
+		else if (Pending->Upscaler.Method != ERageUpscalerMethod::DLSS)
+		{
+			Reason = RAGE_LOC("RequiresDLSS");
+		}
+		else
+		{
+			Reason = RAGE_LOC("RequiresRayTracing");
+		}
+	}
+
+	DLSSRayReconstructionRow->SetRowEnabled(bCanUseRR, Reason);
 }
 
 void URageVideoSettingsPanel::ModifyPendingRayTracing(TFunctionRef<void(FRageRayTracingSettings&)> Mutator)
@@ -636,12 +687,23 @@ void URageVideoSettingsPanel::HandleFieldOfViewChanged(FName RowId, FRageVariant
 void URageVideoSettingsPanel::HandleHDRChanged(FName RowId, FRageVariant bNewValue)
 {
 	VideoSettings->SetPendingHDREnabled(bNewValue.Get<bool>());
-	HDRNitsRow->SetIsEnabled(bNewValue.Get<bool>() && VideoSettings->IsHDRSupported());
+	
+	IF_VALID(HDRNitsRow)
+		HDRNitsRow->SetRowEnabled(bNewValue.Get<bool>() && VideoSettings->IsHDRSupported(), FText::GetEmpty());
+	END_IF
 }
 
 void URageVideoSettingsPanel::HandleHDRNitsChanged(FName RowId, FRageVariant NewIndex)
 {
 	VideoSettings->SetPendingHDRDisplayNits(static_cast<ERageHDRDisplayNits>(NewIndex.Get<int32>()));
+}
+
+void URageVideoSettingsPanel::HandleGraphicsAPIChanged(FName RowId, FRageVariant NewIndex)
+{
+	if (SelectableRHITypes.IsValidIndex(NewIndex.Get<int32>()))
+	{
+		VideoSettings->SetPendingPreferredRHI(SelectableRHITypes[NewIndex.Get<int32>()]);
+	}
 }
 
 void URageVideoSettingsPanel::HandleQualityPresetChanged(FName RowId, FRageVariant NewIndex)

@@ -9,6 +9,8 @@
 #include "RageInputSettings.h"
 #include "RageSettingsDeveloperSettings.h"
 #include "Engine/Engine.h"
+#include "HAL/PlatformProcess.h"
+#include "Misc/CommandLine.h"
 #include "RageSettingsShared/Public/RageSettingsSharedDebug.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(RageSettingsSubsystem)
@@ -56,6 +58,8 @@ void URageSettingsSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 void URageSettingsSubsystem::Deinitialize()
 {
+	FTSTicker::RemoveTicker(RestartCheckTickerHandle);
+
 	VideoSettings->DirtyStateChangedDelegate.RemoveAll(this);
 	AudioSettings->DirtyStateChangedDelegate.RemoveAll(this);
 	GameSettings->DirtyStateChangedDelegate.RemoveAll(this);
@@ -117,6 +121,8 @@ void URageSettingsSubsystem::ApplyAllDirtySettings()
 			CategoryAppliedDelegate.Broadcast(Id);
 		}
 	}
+
+	DeferredEvaluateRestartRequirement();
 }
 
 void URageSettingsSubsystem::SaveAllSettings()
@@ -142,6 +148,8 @@ void URageSettingsSubsystem::ApplyAndSaveAllDirtySettings()
 			CategoryAppliedDelegate.Broadcast(Id);
 		}
 	}
+	
+	DeferredEvaluateRestartRequirement();
 }
 
 void URageSettingsSubsystem::RevertAllPendingChanges()
@@ -170,6 +178,8 @@ void URageSettingsSubsystem::ResetCategoryToDefault(ERageSettingsCategory Catego
 		Target->ApplySettings();
 		Target->SaveSettings();
 		CategoryAppliedDelegate.Broadcast(Category);
+		
+		DeferredEvaluateRestartRequirement();
 	}
 }
 
@@ -192,6 +202,11 @@ void URageSettingsSubsystem::ResetAllCategoriesToDefault(bool bApplyImmediately)
 			CategoryAppliedDelegate.Broadcast(Id);
 		}
 	}
+
+	if (bApplyImmediately)
+	{
+		DeferredEvaluateRestartRequirement();
+	}
 }
 
 bool URageSettingsSubsystem::HasAnyDirtySettings() const
@@ -210,6 +225,51 @@ bool URageSettingsSubsystem::IsCategoryDirty(ERageSettingsCategory Category) con
 {
 	const IRageSettingsCategoryInterface* Target = ResolveCategory(Category);
 	return Target && Target->IsDirty();
+}
+
+bool URageSettingsSubsystem::IsRestartRequired() const
+{
+	return IsValid(VideoSettings) && VideoSettings->IsRestartRequired();
+}
+
+void URageSettingsSubsystem::DeferredEvaluateRestartRequirement()
+{
+	/* Aggregate latent calls*/
+	FTSTicker::RemoveTicker(RestartCheckTickerHandle);
+	RestartCheckTickerHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this,
+		[this](float) -> bool
+		{
+			RestartRequirementEvaluatedDelegate.Broadcast(IsRestartRequired());
+			return false;
+		}));
+}
+
+bool URageSettingsSubsystem::RestartGame()
+{
+	if (GIsEditor)
+	{
+		S_LOG(Warning, "Rage Settings: RestartGame() does nothing in the editor. The setting is written - launch a standalone or packaged build to see it take effect.");
+		return false;
+	}
+
+	const FString ExecutablePath = FPlatformProcess::ExecutablePath();
+	
+	const FString Parameters = FCommandLine::GetOriginal();
+
+	FProcHandle Handle = FPlatformProcess::CreateProc(*ExecutablePath, *Parameters, true, false, false, nullptr, 0, nullptr, nullptr);
+	if (!Handle.IsValid())
+	{
+		S_LOG(Error, "Rage Settings: could not relaunch {path}, staying in the current process.", ExecutablePath);
+		return false;
+	}
+
+	FPlatformProcess::CloseProc(Handle);
+
+	S_LOG(Log, "Rage Settings: relaunched {path}, shutting this process down.", ExecutablePath);
+
+	/* Might require more work with steam, not sure steam SDK would be happy with a direct exe restart over Url lunch path, tbd.*/
+	FPlatformMisc::RequestExit(false, TEXT("URageSettingsSubsystem::RestartGame"));
+	return true;
 }
 
 void URageSettingsSubsystem::HandleCategoryDirtyStateChanged(ERageSettingsCategory Category, bool bIsDirty)

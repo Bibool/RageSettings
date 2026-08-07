@@ -29,8 +29,14 @@ public class RageSettings : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
 			"RHI",
+			"RenderCore",
 			"RageSettingsShared"
 		});
+		
+		if (Target.Platform == UnrealTargetPlatform.Win64)
+		{
+			AddEngineThirdPartyPrivateStaticDependencies(Target, "Vulkan");
+		}
 
 		/* Although the plugin works with upscaler plugins, it should also not require them; hence we set up guards and macros. */
 
@@ -47,9 +53,11 @@ public class RageSettings : ModuleRules
 		{
 			PublicDefinitions.Add("WITH_DLSS=0");
 		}
+		
+		bool bHasStreamlineDLSSG = IsPluginPresent("Streamline") && IsPluginPresent("StreamlineDLSSG");
+		bool bHasStreamlineReflex = IsPluginPresent("Streamline") && IsPluginPresent("StreamlineReflex");
 
-		/* WITH_STREAMLINE comes from StreamlineBlueprint, which StreamlineDLSSGBlueprint re-exports. */
-		if (IsPluginPresent("Streamline") && IsPluginPresent("StreamlineDLSSG"))
+		if (bHasStreamlineDLSSG)
 		{
 			PrivateDependencyModuleNames.AddRange(new string[]
 			{
@@ -57,10 +65,19 @@ public class RageSettings : ModuleRules
 				"StreamlineDLSSGBlueprint"
 			});
 		}
-		else
+
+		if (bHasStreamlineReflex)
+		{
+			PrivateDependencyModuleNames.Add("StreamlineReflexBlueprint");
+		}
+
+		if (!bHasStreamlineDLSSG && !bHasStreamlineReflex)
 		{
 			PublicDefinitions.Add("WITH_STREAMLINE=0");
 		}
+
+		PublicDefinitions.Add("WITH_STREAMLINE_DLSSG=" + (bHasStreamlineDLSSG ? "1" : "0"));
+		PublicDefinitions.Add("WITH_STREAMLINE_REFLEX=" + (bHasStreamlineReflex ? "1" : "0"));
 
 		/* WITH_XESS / WITH_XEFG / WITH_XELL come from the matching XeSS Blueprint modules. */
 		if (IsPluginPresent("XeSS"))

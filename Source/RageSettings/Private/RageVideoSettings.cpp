@@ -4,9 +4,11 @@
 #include "RageVideoSettings.h"
 
 #include "RageSettingsDeveloperSettings.h"
+#include "RageRHISupport.h"
 #include "RageScalabilityCategory.h"
 #include "RageSettingsReflectionUtils.h"
 #include "RHI.h"
+#include "RenderUtils.h"
 #include "HAL/IConsoleManager.h"
 #include "Misc/Optional.h"
 #include "Containers/Ticker.h"
@@ -18,8 +20,11 @@
 #if WITH_DLSS
 #include "DLSSLibrary.h"
 #endif
-#if WITH_STREAMLINE
+#if WITH_STREAMLINE_DLSSG
 #include "StreamlineLibraryDLSSG.h"
+#endif
+#if WITH_STREAMLINE_REFLEX
+#include "StreamlineLibraryReflex.h"
 #endif
 #if WITH_FSR
 #include "FFXFSRSettings.h"
@@ -37,7 +42,7 @@
 namespace RageVideoCVars
 {
 	/* UE Native Cvars */
-	static const TCHAR* RayTracingMaster = TEXT("r.RayTracing");
+	static const TCHAR* RayTracingMaster = TEXT("r.RayTracing.Enable");
 	static const TCHAR* RayTracingShadows = TEXT("r.RayTracing.Shadows");
 	static const TCHAR* RayTracingReflections = TEXT("r.RayTracing.Reflections");
 	static const TCHAR* RayTracingGI = TEXT("r.RayTracing.GlobalIllumination");
@@ -125,7 +130,37 @@ namespace RageUpscalerMapping
 	}
 #endif
 
-#if WITH_STREAMLINE
+#if WITH_DLSS
+	static ERageFeatureSupport FromVendor(UDLSSSupport Support)
+	{
+		switch (Support)
+		{
+			case UDLSSSupport::Supported:                            return ERageFeatureSupport::Supported;
+			case UDLSSSupport::NotSupportedIncompatibleHardware:     return ERageFeatureSupport::IncompatibleHardware;
+			case UDLSSSupport::NotSupportedDriverOutOfDate:          return ERageFeatureSupport::DriverOutOfDate;
+			case UDLSSSupport::NotSupportedOperatingSystemOutOfDate: return ERageFeatureSupport::OperatingSystemOutOfDate;
+			default:                                                 return ERageFeatureSupport::NotSupported;
+		}
+	}
+#endif
+
+#if WITH_STREAMLINE_DLSSG || WITH_STREAMLINE_REFLEX
+	static ERageFeatureSupport FromVendorStreamline(EStreamlineFeatureSupport Support)
+	{
+		switch (Support)
+		{
+			case EStreamlineFeatureSupport::Supported:                             		return ERageFeatureSupport::Supported;
+			case EStreamlineFeatureSupport::NotSupportedIncompatibleHardware:      		return ERageFeatureSupport::IncompatibleHardware;
+			case EStreamlineFeatureSupport::NotSupportedDriverOutOfDate:           		return ERageFeatureSupport::DriverOutOfDate;
+			case EStreamlineFeatureSupport::NotSupportedOperatingSystemOutOfDate:  		return ERageFeatureSupport::OperatingSystemOutOfDate;
+			case EStreamlineFeatureSupport::NotSupportedByRHI:                     		return ERageFeatureSupport::NotSupportedByRHI;
+			case EStreamlineFeatureSupport::NotSupportedHardewareSchedulingDisabled:	return ERageFeatureSupport::HardwareSchedulingDisabled;
+			default:																	return ERageFeatureSupport::NotSupported;
+		}
+	}
+#endif
+
+#if WITH_STREAMLINE_DLSSG
 	static EStreamlineDLSSGMode ToVendorDLSSG(ERageFrameGenerationMode Mode)
 	{
 		switch (Mode)
@@ -232,6 +267,8 @@ void URageVideoSettings::LoadSettings()
 {
 	Super::LoadSettings(true);
 
+	ReconcilePreferredRHIWithActual();
+
 	Pending = CastChecked<URageVideoSettings>(RageSettings::CreateShadowInstance(this, this));
 	Defaults = CastChecked<URageVideoSettings>(RageSettings::CreateShadowInstance(this, GetClass()->GetDefaultObject()));
 
@@ -249,6 +286,7 @@ void URageVideoSettings::ApplySettings()
 	ApplyRayTracingCVars(RayTracing);
 	ApplyUpscalerSettings(Upscaler);
 	ApplyPostProcessCVars();
+	ApplyPreferredRHI();
 	RageVideoCVars::SetFloat(RageVideoCVars::Gamma, Brightness);
 
 	const int32 DisplayNits = RageHDRDisplayNits::ToInt32(HDRDisplayNits);
@@ -372,6 +410,19 @@ void URageVideoSettings::SetPendingChromaticAberrationEnabled(bool bEnabled)
 	BroadcastDirtyIfChanged(bWasDirty);
 }
 
+void URageVideoSettings::SetPendingPreferredRHI(ERageRHIType NewRHI)
+{
+	if (!RageRHI::IsTypeSelectable(NewRHI))
+	{
+		S_LOG(Warning, "Rage Settings: refusing to stage an unselectable graphics API - this build or this machine cannot boot it.");
+		return;
+	}
+
+	const bool bWasDirty = IsDirty();
+	Pending->PreferredRHI = NewRHI;
+	BroadcastDirtyIfChanged(bWasDirty);
+}
+
 bool URageVideoSettings::IsHDRSupported() const
 {
 	/* Worth noting regarding HDR, your screen could support it, but if not turned on it will return false here.
@@ -466,7 +517,7 @@ const FRageRayTracingSettings& URageVideoSettings::GetPendingRayTracingSettings(
 
 bool URageVideoSettings::IsRayTracingSupported() const
 {
-	return GRHISupportsRayTracing;
+	return GIsRHIInitialized && IsRayTracingAllowed();
 }
 
 void URageVideoSettings::SetPendingUpscalerSettings(const FRageUpscalerSettings& NewSettings)
@@ -500,6 +551,16 @@ TArray<ERageUpscalerMethod> URageVideoSettings::GetAvailableUpscalerMethods() co
 	return Methods;
 }
 
+void URageVideoSettings::ClampUpscalerToSupported()
+{
+	ClampUpscalerMethodToSupported(Upscaler);
+	
+	if (IsValid(Pending))
+	{
+		ClampUpscalerMethodToSupported(Pending->Upscaler);
+	}
+}
+
 bool URageVideoSettings::IsDLSSSupported() const
 {
 #if WITH_DLSS
@@ -522,7 +583,7 @@ bool URageVideoSettings::IsDLSSRRSupported() const
 
 bool URageVideoSettings::IsDLSSFrameGenSupported() const
 {
-#if WITH_STREAMLINE
+#if WITH_STREAMLINE_DLSSG
 	return UStreamlineLibraryDLSSG::IsDLSSGSupported();
 #else
 	return false;
@@ -532,7 +593,20 @@ bool URageVideoSettings::IsDLSSFrameGenSupported() const
 bool URageVideoSettings::IsFSRSupported() const
 {
 #if WITH_FSR
-	return true; /* FSR is hardware-agnostic, FSR4 is not. Internally will downgrade to a usable FSR version. */
+	/** FSR is hardware-agnostic - it runs on any vendor's GPU and internally downgrades to a version
+	 * the card can handle (FSR4 being the exception that does need specific hardware). It is not
+	 * RHI-agnostic though; the FFX plugin only ships a D3D12 backend with no support for D3D11 nor Vulkan.
+	 * This wasn't an issue before as game only ran in auto RHI (d3d12), but now we can switch so we must account for it. */
+	return RageRHI::GetActiveType() == ERageRHIType::DirectX12;
+#else
+	return false;
+#endif
+}
+
+bool URageVideoSettings::IsReflexSupported() const
+{
+#if WITH_STREAMLINE_REFLEX
+	return UStreamlineLibraryReflex::IsReflexSupported();
 #else
 	return false;
 #endif
@@ -562,6 +636,48 @@ bool URageVideoSettings::IsXeLLSupported() const
 	return UXeLLBlueprintLibrary::IsXeLLSupported() && UXeLLBlueprintLibrary::IsXeLLAvailable();
 #else
 	return false;
+#endif
+}
+
+ERageFeatureSupport URageVideoSettings::QueryDLSSRRSupport() const
+{
+#if WITH_DLSS
+	/** D3D12 only as NGXD3D12RHI.cpp:57 returns true where NGXD3D11RHI.cpp:54 and NGXVulkanRHI.cpp:55
+	 * return false. Checked here because UDLSSSupport has no by-RHI value, so the vendor reports this
+	 * as a plain NotSupported (Which doesn't tell the user much). */
+	if (RageRHI::GetActiveType() != ERageRHIType::DirectX12)
+	{
+		return ERageFeatureSupport::NotSupportedByRHI;
+	}
+
+	return RageUpscalerMapping::FromVendor(UDLSSLibrary::QueryDLSSRRSupport());
+#else
+	return ERageFeatureSupport::NotSupported;
+#endif
+}
+
+ERageFeatureSupport URageVideoSettings::QueryDLSSFrameGenSupport() const
+{
+#if WITH_STREAMLINE_DLSSG
+	return RageUpscalerMapping::FromVendorStreamline(UStreamlineLibraryDLSSG::QueryDLSSGSupport());
+#else
+	return ERageFeatureSupport::NotSupported;
+#endif
+}
+
+ERageFeatureSupport URageVideoSettings::QueryReflexSupport() const
+{
+#if WITH_STREAMLINE_REFLEX
+	/** Streamline ships no Vulkan backend, but StreamlineLibraryReflex.cpp:132 only ever answers
+	 * Supported or NotSupported, unlike DLSS-G it never reports NotSupportedByRHI itself. */
+	if (RageRHI::GetActiveType() == ERageRHIType::Vulkan)
+	{
+		return ERageFeatureSupport::NotSupportedByRHI;
+	}
+
+	return RageUpscalerMapping::FromVendorStreamline(UStreamlineLibraryReflex::QueryReflexSupport());
+#else
+	return ERageFeatureSupport::NotSupported;
 #endif
 }
 
@@ -599,7 +715,7 @@ TArray<ERageFrameGenerationMode> URageVideoSettings::GetSupportedDLSSFrameGenMod
 {
 	/* Off is always a valid choice regardless of hardware. Only x2/x3/x4 are hardware-gated. */
 	TArray<ERageFrameGenerationMode> Result = { ERageFrameGenerationMode::Off };
-#if WITH_STREAMLINE
+#if WITH_STREAMLINE_DLSSG
 	for (EStreamlineDLSSGMode VendorMode : UStreamlineLibraryDLSSG::GetSupportedDLSSGModes())
 	{
 		if (TOptional<ERageFrameGenerationMode> Mapped = RageUpscalerMapping::FromVendorDLSSG(VendorMode))
@@ -625,6 +741,46 @@ TArray<ERageFrameGenerationMode> URageVideoSettings::GetSupportedXeSSFrameGenMod
 	}
 #endif
 	return Result;
+}
+
+bool URageVideoSettings::IsRHISelectionSupported() const
+{
+	return RageRHI::IsSelectionSupported();
+}
+
+TArray<ERageRHIType> URageVideoSettings::GetSelectableRHITypes() const
+{
+	return RageRHI::GetSelectableTypes();
+}
+
+ERageRHIType URageVideoSettings::GetActiveRHIType() const
+{
+	return RageRHI::GetActiveType();
+}
+
+bool URageVideoSettings::IsRestartRequiredForRHI() const
+{
+	if (!RageRHI::IsSelectionSupported() || GIsEditor)
+	{
+		return false;
+	}
+
+	const ERageRHIType Active = RageRHI::GetActiveType();
+	return Active != ERageRHIType::Auto && RageRHI::ResolveEffectiveType(PreferredRHI) != Active;
+}
+
+bool URageVideoSettings::IsRestartRequiredForFrameGeneration() const
+{
+#if WITH_XEFG
+	return UXeFGBlueprintLibrary::IfRelaunchRequiredByXeFG();
+#else
+	return false;
+#endif
+}
+
+bool URageVideoSettings::IsRestartRequired() const
+{
+	return IsRestartRequiredForRHI() || IsRestartRequiredForFrameGeneration();
 }
 
 void URageVideoSettings::PushCurrentIntoEngineProperties()
@@ -713,7 +869,7 @@ void URageVideoSettings::ApplyUpscalerSettings(const FRageUpscalerSettings& Sett
 	RageVideoCVars::SetBool(RageVideoCVars::DLSSEnable, false);
 #endif
 
-#if WITH_STREAMLINE
+#if WITH_STREAMLINE_DLSSG
 	DeferredApplyDLSSFrameGeneration((bWantsDLSS && UStreamlineLibraryDLSSG::IsDLSSGSupported())
 		                                 ? Settings.DLSSFrameGenMode
 		                                 : ERageFrameGenerationMode::Off);
@@ -747,6 +903,47 @@ void URageVideoSettings::ApplyPostProcessCVars()
 	RageVideoCVars::SetBool(RageVideoCVars::SceneColorFringe, bChromaticAberrationEnabled);
 }
 
+void URageVideoSettings::ApplyPreferredRHI()
+{
+	if (!RageRHI::IsSelectionSupported())
+	{
+		return;
+	}
+
+	if (!RageRHI::IsTypeSelectable(PreferredRHI))
+	{
+		S_LOG(Warning, "Rage Settings: preferred RHI is not selectable on this build/hardware, handing the choice back to the project default.");
+		PreferredRHI = ERageRHIType::Auto;
+		Pending->PreferredRHI = ERageRHIType::Auto;
+	}
+
+	RageRHI::WritePreference(PreferredRHI);
+}
+
+void URageVideoSettings::ReconcilePreferredRHIWithActual()
+{
+	if (!RageRHI::IsSelectionSupported() || GIsEditor)
+	{
+		return;
+	}
+
+	const ERageRHIType Active = RageRHI::GetActiveType();
+	if (Active == ERageRHIType::Auto)
+	{
+		return;
+	}
+
+	if (RageRHI::ResolveEffectiveType(PreferredRHI) == Active)
+	{
+		return;
+	}
+
+	S_LOG(Log, "Rage Settings: preferred RHI did not survive startup, following the API that actually loaded instead.");
+	
+	PreferredRHI = RageRHI::GetProjectDefaultType() == Active ? ERageRHIType::Auto : Active;
+	RageRHI::WritePreference(PreferredRHI);
+}
+
 void URageVideoSettings::BroadcastDirtyIfChanged(bool bWasDirtyBefore)
 {
 	const bool bIsDirtyNow = IsDirty();
@@ -777,7 +974,7 @@ void URageVideoSettings::ClampUpscalerMethodToSupported(FRageUpscalerSettings& S
 /* We defer applying FrameGeneration due to a crash that occurs when applied at the same time as resolution settings. */
 void URageVideoSettings::DeferredApplyDLSSFrameGeneration(ERageFrameGenerationMode DesiredMode)
 {
-#if WITH_STREAMLINE
+#if WITH_STREAMLINE_DLSSG
 	FTSTicker::RemoveTicker(DLSSFrameGenTickerHandle);
 	DLSSFrameGenTickerHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this,
 		[DesiredMode](float) -> bool

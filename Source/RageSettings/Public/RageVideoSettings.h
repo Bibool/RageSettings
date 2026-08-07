@@ -4,9 +4,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "RageFeatureSupport.h"
 #include "RageHDRDisplayNits.h"
 #include "RageQualityPreset.h"
 #include "RageRayTracingSettings.h"
+#include "RageRHIType.h"
 #include "GameFramework/GameUserSettings.h"
 #include "RageSettingsCategoryInterface.h"
 #include "RageUpscalerSettings.h"
@@ -87,6 +89,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Rage|Video")
 	void SetPendingChromaticAberrationEnabled(bool bEnabled);
+
+	UFUNCTION(BlueprintCallable, Category = "Rage|Video")
+	void SetPendingPreferredRHI(ERageRHIType NewRHI);
 #pragma endregion
 
 #pragma region GETTERS
@@ -122,6 +127,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Rage|Video")
 	TArray<ERageUpscalerMethod> GetAvailableUpscalerMethods() const;
+	
+	UFUNCTION(BlueprintCallable, Category = "Rage|Video")
+	void ClampUpscalerToSupported();
 
 	UFUNCTION(BlueprintPure, Category = "Rage|Video")
 	bool IsDLSSSupported() const;
@@ -145,6 +153,18 @@ public:
 	bool IsXeLLSupported() const;
 
 	UFUNCTION(BlueprintPure, Category = "Rage|Video")
+	bool IsReflexSupported() const;
+	
+	UFUNCTION(BlueprintPure, Category = "Rage|Video")
+	ERageFeatureSupport QueryDLSSRRSupport() const;
+
+	UFUNCTION(BlueprintPure, Category = "Rage|Video")
+	ERageFeatureSupport QueryDLSSFrameGenSupport() const;
+
+	UFUNCTION(BlueprintPure, Category = "Rage|Video")
+	ERageFeatureSupport QueryReflexSupport() const;
+
+	UFUNCTION(BlueprintPure, Category = "Rage|Video")
 	TArray<ERageDLSSMode> GetSupportedDLSSModes() const;
 
 	UFUNCTION(BlueprintPure, Category = "Rage|Video")
@@ -155,6 +175,24 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Rage|Video")
 	TArray<ERageFrameGenerationMode> GetSupportedXeSSFrameGenModes() const;
+	
+	UFUNCTION(BlueprintPure, Category = "Rage|Video")
+	bool IsRHISelectionSupported() const;
+	
+	UFUNCTION(BlueprintPure, Category = "Rage|Video")
+	TArray<ERageRHIType> GetSelectableRHITypes() const;
+
+	UFUNCTION(BlueprintPure, Category = "Rage|Video")
+	ERageRHIType GetActiveRHIType() const;
+	
+	UFUNCTION(BlueprintPure, Category = "Rage|Video")
+	bool IsRestartRequiredForRHI() const;
+	
+	UFUNCTION(BlueprintPure, Category = "Rage|Video")
+	bool IsRestartRequiredForFrameGeneration() const;
+
+	UFUNCTION(BlueprintPure, Category = "Rage|Video")
+	bool IsRestartRequired() const;
 
 	UFUNCTION(BlueprintPure, Category = "Rage|Video")
 	URageVideoSettings* GetPendingSettings() const { return Pending; }
@@ -193,6 +231,9 @@ public:
 
 	UPROPERTY(Config, BlueprintReadWrite, Category = "Rage|Video|Display")
 	ERageHDRDisplayNits HDRDisplayNits = ERageHDRDisplayNits::Nits1000;
+	
+	UPROPERTY(Config, BlueprintReadWrite, Category = "Rage|Video|Display")
+	ERageRHIType PreferredRHI = ERageRHIType::Auto;
 
 	UPROPERTY(Config, BlueprintReadWrite, Category = "Rage|Video|Scalability")
 	ERageQualityPreset QualityPreset = ERageQualityPreset::High;
@@ -257,6 +298,8 @@ private:
 	void ApplyRayTracingCVars(const FRageRayTracingSettings& Settings);
 	void ApplyUpscalerSettings(const FRageUpscalerSettings& Settings);
 	void ApplyPostProcessCVars();
+	void ApplyPreferredRHI();
+	void ReconcilePreferredRHIWithActual();
 	void BroadcastDirtyIfChanged(bool bWasDirtyBefore);
 
 	void ClampUpscalerMethodToSupported(FRageUpscalerSettings& Settings) const;
