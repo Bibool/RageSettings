@@ -936,27 +936,8 @@ void URageVideoSettings::ApplyUpscalerSettings(const FRageUpscalerSettings& Sett
 	RageVideoCVars::SetInt(RageVideoCVars::ReflexMode, StaticCast<int32>(Settings.ReflexMode));
 
 #if WITH_DLSS
+	/** DLSS claims r.ScreenPercentage itself. */
 	UDLSSLibrary::EnableDLSS(bWantsDLSS);
-	if (bWantsDLSS)
-	{
-		const UDLSSMode VendorMode = RageUpscalerMapping::ToVendor(Settings.DLSSMode);
-		bool bIsModeSupported = false;
-		bool bIsFixedScreenPercentage = false;
-		float OptimalScreenPercentage = 100.f;
-		float MinScreenPercentage = 100.f;
-		float MaxScreenPercentage = 100.f;
-		float OptimalSharpness_DEPRECATED = 0.f; /* Dlss lib deprecates this. */
-		UDLSSLibrary::GetDLSSModeInformation(
-			VendorMode,
-			FVector2D(StaticCast<float>(Resolution.X), StaticCast<float>(Resolution.Y)),
-			bIsModeSupported, OptimalScreenPercentage, bIsFixedScreenPercentage,
-			MinScreenPercentage, MaxScreenPercentage, OptimalSharpness_DEPRECATED);
-
-		if (bIsModeSupported)
-		{
-			RageVideoCVars::SetFloat(RageVideoCVars::ScreenPercentage, OptimalScreenPercentage);
-		}
-	}
 
 	const bool bRayTracingActive = RayTracing.bEnabled && IsRayTracingSupported();
 	if (bWantsDLSS && bRayTracingActive && UDLSSLibrary::IsDLSSRRSupported())

@@ -27,6 +27,12 @@ namespace
 {
 	FText ResolveSupportReason(ERageFeatureSupport Support)
 	{
+		/* Supported should not have a reason, is should simply be enabled. */
+		if (Support == ERageFeatureSupport::Supported)
+		{
+			return FText::GetEmpty();
+		}
+
 		return RageSettingsUI::ResolveLocTextForEnum(Support);
 	}
 
@@ -682,9 +688,13 @@ void URageVideoSettingsPanel::RefreshDLSSRayReconstructionRowEnabled()
 	if (!bCanUseRR)
 	{
 		const ERageFeatureSupport RRSupport = VideoSettings->QueryDLSSRRSupport();
-		if (RRSupport != ERageFeatureSupport::Supported)
+		if (RRSupport == ERageFeatureSupport::NotSupportedByRHI)
 		{
 			Reason = ResolveSupportReason(RRSupport);
+		}
+		else if (!bRayTracingActive)
+		{
+			Reason = RAGE_LOC("RequiresRayTracing");
 		}
 		else if (Pending->Upscaler.Method != ERageUpscalerMethod::DLSS)
 		{
@@ -692,7 +702,7 @@ void URageVideoSettingsPanel::RefreshDLSSRayReconstructionRowEnabled()
 		}
 		else
 		{
-			Reason = RAGE_LOC("RequiresRayTracing");
+			Reason = ResolveSupportReason(RRSupport);
 		}
 	}
 
