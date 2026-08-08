@@ -170,6 +170,9 @@ public:
 	bool IsAntiAliasingMethodSupported(ERageAntiAliasingMethod Method) const;
 	
 	UFUNCTION(BlueprintPure, Category = "Rage|Video")
+	bool IsThirdPartyUpscalerActive() const;
+
+	UFUNCTION(BlueprintPure, Category = "Rage|Video")
 	bool IsAntiAliasingMethodOverriddenByUpscaler() const;
 	
 	UFUNCTION(BlueprintPure, Category = "Rage|Video")
@@ -324,6 +327,7 @@ private:
 	void ApplyAntiAliasingCVars();
 	void ClampAntiAliasingMethodToSupported();
 	void ApplyPreferredRHI();
+	void DeferredApplyStartupSettings();
 	void ReconcilePreferredRHIWithActual();
 	void BroadcastDirtyIfChanged(bool bWasDirtyBefore);
 
@@ -334,4 +338,5 @@ private:
 
 	FTSTicker::FDelegateHandle DLSSFrameGenTickerHandle;
 	FTSTicker::FDelegateHandle XeSSFrameGenTickerHandle;
+	FTSTicker::FDelegateHandle StartupApplyTickerHandle;
 };

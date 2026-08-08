@@ -296,6 +296,8 @@ void URageVideoSettingsPanel::RefreshFromSettings()
 		const int32 Index = CachedResolutions.IndexOfByKey(Pending->Resolution);
 		ResolutionRow->SetSelectedIndex(Index != INDEX_NONE ? Index : 0);
 	END_IF
+
+	RefreshResolutionRowEnabled();
 	
 	IF_VALID(WindowModeRow)
 		WindowModeRow->SetSelectedIndex(static_cast<int32>(Pending->WindowMode.GetValue()));
@@ -480,6 +482,14 @@ void URageVideoSettingsPanel::RefreshGraphicsAPIOptions()
 	END_IF
 }
 
+void URageVideoSettingsPanel::RefreshResolutionRowEnabled()
+{
+	IF_VALID(ResolutionRow)
+		/* Borderless sizes itself to the monitor hence. */
+		ResolutionRow->SetRowEnabled(VideoSettings->GetPendingSettings()->WindowMode != EWindowMode::WindowedFullscreen,RAGE_LOC("UsingWindowsRes"));
+	END_IF
+}
+
 void URageVideoSettingsPanel::RefreshAntiAliasingOptions()
 {
 	IF_VALID(AntiAliasingMethodRow)
@@ -498,8 +508,15 @@ void URageVideoSettingsPanel::RefreshAntiAliasingRowsEnabled()
 {
 	const URageVideoSettings* Pending = VideoSettings->GetPendingSettings();
 
+	const bool bUpscalerActive = VideoSettings->IsThirdPartyUpscalerActive();
+
 	IF_VALID(AntiAliasingMethodRow)
-		AntiAliasingMethodRow->SetRowEnabled(!VideoSettings->IsAntiAliasingMethodOverriddenByUpscaler(), RAGE_LOC("ControlledByUpscaler"));
+		AntiAliasingMethodRow->SetRowEnabled(!bUpscalerActive, RAGE_LOC("ControlledByUpscaler"));
+	END_IF
+
+	IF_VALID(ResolutionScaleRow)
+		/* DLSS/FSR/XeSS overrides the render resolution. */
+		ResolutionScaleRow->SetRowEnabled(!bUpscalerActive, RAGE_LOC("ControlledByUpscaler"));
 	END_IF
 
 	IF_VALID(MSAASampleCountRow)
@@ -707,6 +724,7 @@ void URageVideoSettingsPanel::HandleResolutionChanged(FName RowId, FRageVariant 
 void URageVideoSettingsPanel::HandleWindowModeChanged(FName RowId, FRageVariant NewIndex)
 {
 	VideoSettings->SetPendingWindowMode(static_cast<EWindowMode::Type>(NewIndex.Get<int32>()));
+	RefreshResolutionRowEnabled(); // borderless takes its size from the desktop, not from this setting
 }
 
 void URageVideoSettingsPanel::HandleVSyncChanged(FName RowId, FRageVariant bNewValue)

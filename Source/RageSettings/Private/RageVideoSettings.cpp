@@ -10,6 +10,7 @@
 #include "RHI.h"
 #include "RenderUtils.h"
 #include "SceneUtils.h"
+#include "Scalability.h"
 #include "HAL/IConsoleManager.h"
 #include "Misc/Optional.h"
 #include "Containers/Ticker.h"
@@ -303,6 +304,7 @@ void URageVideoSettings::LoadSettings()
 	Defaults = CastChecked<URageVideoSettings>(RageSettings::CreateShadowInstance(this, GetClass()->GetDefaultObject()));
 
 	PushCurrentIntoEngineProperties();
+	DeferredApplyStartupSettings();
 }
 
 void URageVideoSettings::ApplySettings()
@@ -833,6 +835,11 @@ TArray<ERageAntiAliasingMethod> URageVideoSettings::GetAvailableAntiAliasingMeth
 
 bool URageVideoSettings::IsAntiAliasingMethodOverriddenByUpscaler() const
 {
+	return IsThirdPartyUpscalerActive();
+}
+
+bool URageVideoSettings::IsThirdPartyUpscalerActive() const
+{
 	const ERageUpscalerMethod Method = IsValid(Pending) ? Pending->Upscaler.Method : Upscaler.Method;
 	return Method == ERageUpscalerMethod::DLSS
 		|| Method == ERageUpscalerMethod::FSR
@@ -1020,6 +1027,37 @@ void URageVideoSettings::ClampAntiAliasingMethodToSupported()
 	{
 		Pending->AntiAliasingMethod = ERageAntiAliasingMethod::TSR;
 	}
+}
+
+/** Everything the player saved is only staged by LoadSettings, PushCurrentIntoEngineProperties fills
+ * in UGameUserSettings' members and the ScalabilityQuality struct, but nothing reaches a cvar until something calls ApplySettings().
+ * Resolution and window mode are left out on purpose since the engine already brings those up from
+ * GameUserSettings during startup. */
+void URageVideoSettings::DeferredApplyStartupSettings()
+{
+	FTSTicker::RemoveTicker(StartupApplyTickerHandle);
+	StartupApplyTickerHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this,
+		[this](float) -> bool
+		{
+			ClampUpscalerMethodToSupported(Upscaler);
+
+			Scalability::SetQualityLevels(ScalabilityQuality);
+
+			ApplyRayTracingCVars(RayTracing);
+			ApplyUpscalerSettings(Upscaler);
+			ApplyPostProcessCVars();
+			ApplyAntiAliasingCVars();
+			RageVideoCVars::SetFloat(RageVideoCVars::Gamma, Brightness);
+
+			EnableHDRDisplayOutput(bHDREnabled, RageHDRDisplayNits::ToInt32(HDRDisplayNits));
+			
+			if (IsValid(Pending))
+			{
+				RageSettings::CopyObjectProperties(Pending, this);
+			}
+
+			return false;
+		}));
 }
 
 void URageVideoSettings::ApplyPreferredRHI()

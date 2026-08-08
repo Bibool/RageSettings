@@ -166,6 +166,7 @@ private:
 	void RefreshQualityPresetRow();
 	void RefreshResolutionOptions();
 	void RefreshGraphicsAPIOptions();
+	void RefreshResolutionRowEnabled();
 	void RefreshAntiAliasingOptions();
 	void RefreshAntiAliasingRowsEnabled();
 	void RefreshUpscalerModeOptions();
