@@ -14,6 +14,7 @@
 #endif
 
 struct FRageKeybindConfig;
+class UInputMappingContext;
 
 UCLASS(Config = Game, DefaultConfig, meta=(DisplayName = "Rage - Settings"))
 class RAGESETTINGS_API URageSettingsDeveloperSettings : public UDeveloperSettings
@@ -67,6 +68,9 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category = "Rage|Input")
 	TArray<FRageKeybindConfig> RemappableActions;
 	
+	UPROPERTY(Config, EditAnywhere, Category = "Rage|Input")
+	TArray<TSoftObjectPtr<UInputMappingContext>> RemappableContexts;
+
 	UPROPERTY(Config, EditAnywhere, Category = "Rage|Input")
 	bool bRebindConflictSwapsKey = true;
 

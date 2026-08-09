@@ -54,6 +54,9 @@ void URageInputSettingsPanel::NativeConstruct()
 void URageInputSettingsPanel::InitializePanel(URageSettingsSubsystem* InSubsystem)
 {
 	InputSettings = InSubsystem->GetInputSettings();
+
+	InputSettings->RegisterRemappableContexts();
+
 	BuildRows(RowsContainer, InputSettings->GetPendingSettings());
 	BuildKeybindRows();
 }

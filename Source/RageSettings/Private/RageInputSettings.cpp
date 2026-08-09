@@ -6,6 +6,7 @@
 #include "Engine/GameInstance.h"
 #include "Engine/LocalPlayer.h"
 #include "EnhancedInputSubsystems.h"
+#include "InputMappingContext.h"
 #include "UserSettings/EnhancedInputUserSettings.h"
 #include "GameplayTagContainer.h"
 #include "RageSettingsDeveloperSettings.h"
@@ -119,6 +120,23 @@ UEnhancedInputUserSettings* URageInputSettings::GetEnhancedInputUserSettings() c
 	}
 	
 	return LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>()->GetUserSettings();
+}
+
+void URageInputSettings::RegisterRemappableContexts()
+{
+	UEnhancedInputUserSettings* UserSettings = GetEnhancedInputUserSettings();
+	if (!IsValid(UserSettings))
+	{
+		return;
+	}
+
+	for (const TSoftObjectPtr<UInputMappingContext>& ContextRef : URageSettingsDeveloperSettings::Get()->RemappableContexts)
+	{
+		if (const UInputMappingContext* Context = ContextRef.LoadSynchronous())
+		{
+			UserSettings->RegisterInputMappingContext(Context);
+		}
+	}
 }
 
 bool URageInputSettings::RemapPlayerKey(FName MappingName, FKey NewKey)

@@ -59,6 +59,9 @@ public:
 	float GetMouseSensitivityY() const;
 
 	UFUNCTION(BlueprintCallable, Category = "Rage|Input|Keybinds")
+	void RegisterRemappableContexts();
+
+	UFUNCTION(BlueprintCallable, Category = "Rage|Input|Keybinds")
 	bool RemapPlayerKey(FName MappingName, FKey NewKey);
 
 	UFUNCTION(BlueprintPure, Category = "Rage|Input|Keybinds")
