@@ -350,6 +350,7 @@ private:
 	void ClampAntiAliasingMethodToSupported();
 	void ApplyPreferredRHI();
 	void ApplyPreferredMonitor();
+	void RememberInitialWindowPosition(const FString& MonitorId);
 	void ClampResolutionToMonitor(const FString& MonitorId);
 	void ClampWindowModeToAvailable();
 	void DeferredReapplyDisplayMode();

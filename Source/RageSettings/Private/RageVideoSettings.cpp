@@ -1134,6 +1134,25 @@ void URageVideoSettings::DeferredApplyStartupSettings()
 		}));
 }
 
+void URageVideoSettings::RememberInitialWindowPosition(const FString& MonitorId)
+{
+	const TArray<FRageMonitorInfo> Monitors = RageMonitor::GetMonitors();
+	const FRageMonitorInfo* Target = Monitors.FindByPredicate(
+		[&MonitorId](const FRageMonitorInfo& Monitor) { return Monitor.Id == MonitorId; });
+	
+	const FIntPoint Position = (Target && !Target->bPrimary) ? Target->Position : FIntPoint::ZeroValue;
+	if (Position == InitialWindowPosition)
+	{
+		return;
+	}
+
+	InitialWindowPosition = Position;
+	if (IsValid(Pending))
+	{
+		Pending->InitialWindowPosition = Position;
+	}
+}
+
 void URageVideoSettings::ApplyPreferredMonitor()
 {
 	if (!RageMonitor::IsSelectionSupported())
@@ -1142,9 +1161,10 @@ void URageVideoSettings::ApplyPreferredMonitor()
 	}
 
 	PreferredMonitorId = RageMonitor::ResolveMonitorId(PreferredMonitorId);
-	
+
 	ClampWindowModeToAvailable();
 	ClampResolutionToMonitor(PreferredMonitorId);
+	RememberInitialWindowPosition(PreferredMonitorId);
 
 	if (RageMonitor::MoveGameWindowToMonitor(PreferredMonitorId))
 	{
