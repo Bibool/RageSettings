@@ -79,6 +79,10 @@ public:
 	
 	UFUNCTION(BlueprintPure, Category = "Rage|Settings")
 	bool IsRestartRequired() const;
+
+	/** True between ApplyStartedDelegate and ApplyFinishedDelegate, for UI created mid-apply. */
+	UFUNCTION(BlueprintPure, Category = "Rage|Settings")
+	bool IsApplyInProgress() const { return bApplyInProgress; }
 	
 	UFUNCTION(BlueprintCallable, Category = "Rage|Settings")
 	bool RestartGame();
@@ -92,15 +96,34 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Rage|Delegates")
 	FRageRestartRequirementEvaluated RestartRequirementEvaluatedDelegate;
 
+	/** Fires once when an apply begins, before any category is touched. */
+	UPROPERTY(BlueprintAssignable, Category = "Rage|Delegates")
+	FRageSettingsApplyStarted ApplyStartedDelegate;
+
+	/** Fires once the last category has finished, including work deferred to a later tick. Always
+	 *  follows ApplyStartedDelegate, in the same frame when nothing needed deferring. */
+	UPROPERTY(BlueprintAssignable, Category = "Rage|Delegates")
+	FRageSettingsApplyFinished ApplyFinishedDelegate;
+
 private:
 	UFUNCTION()
 	void HandleCategoryDirtyStateChanged(ERageSettingsCategory Category, bool bIsDirty);
-	
+
 	void DeferredEvaluateRestartRequirement();
+
+	void BeginApply();
+	void EndApplyWhenSettled();
+	void FinishApply();
+	bool IsAnyCategoryApplying() const;
 
 	IRageSettingsCategoryInterface* ResolveCategory(ERageSettingsCategory Category) const;
 
 	FTSTicker::FDelegateHandle RestartCheckTickerHandle;
+	FTSTicker::FDelegateHandle ApplySettledTickerHandle;
+
+	bool bApplyInProgress = false;
+
+	float ApplyHoldRemaining = 0.f;
 	
 	UPROPERTY() 
 	TObjectPtr<URageVideoSettings> VideoSettings = nullptr;

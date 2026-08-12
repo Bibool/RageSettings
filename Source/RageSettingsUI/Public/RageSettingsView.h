@@ -121,6 +121,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<URageConfirmModal> RestartRequiredModal = nullptr;
 	
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional)) 
+	TObjectPtr<UUserWidget> ApplyInProgressView = nullptr;
+	
 	UPROPERTY(EditDefaultsOnly)
 	ERageSettingsCategory DefaultCategory = ERageSettingsCategory::Video;
 
@@ -133,8 +136,7 @@ private:
 	void RefreshDirtyMarkers();
 	void RefreshApplyButtonEnabled();
 	void CloseImmediately();
-
-
+	
 	void HandleVisibilityChanged(ESlateVisibility NewVisibility);
 
 	UFUNCTION() 
@@ -178,6 +180,12 @@ private:
 
 	UFUNCTION()
 	void HandleRestartDeclined();
+	
+	UFUNCTION()
+	void HandleApplyStarted();
+	
+	UFUNCTION()
+	void HandleApplyFinished();
 
 	UPROPERTY()
 	TObjectPtr<URageSettingsSubsystem> Subsystem = nullptr;

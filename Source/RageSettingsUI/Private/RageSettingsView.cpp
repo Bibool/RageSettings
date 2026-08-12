@@ -65,6 +65,9 @@ void URageSettingsView::NativeConstruct()
 		{ERageSettingsCategory::Audio, AudioTabDirtyMarker},
 		{ERageSettingsCategory::Video, VideoTabDirtyMarker},
 		{ERageSettingsCategory::Input, InputTabDirtyMarker}};
+	
+	Subsystem->ApplyStartedDelegate.AddUniqueDynamic(this, &URageSettingsView::HandleApplyStarted);
+	Subsystem->ApplyFinishedDelegate.AddUniqueDynamic(this, &URageSettingsView::HandleApplyFinished);
 
 	GameTabButton->OnClicked.AddUniqueDynamic(this, &URageSettingsView::HandleGameTabClicked);
 	AudioTabButton->OnClicked.AddUniqueDynamic(this, &URageSettingsView::HandleAudioTabClicked);
@@ -283,5 +286,21 @@ void URageSettingsView::HandleRestartDeclined()
 	{
 		bCloseViewAfterRestartPrompt = false;
 		CloseImmediately();
+	}
+}
+
+void URageSettingsView::HandleApplyStarted()
+{
+	if (IsValid(ApplyInProgressView))
+	{
+		ApplyInProgressView->SetVisibility(ESlateVisibility::HitTestInvisible);
+	}
+}
+
+void URageSettingsView::HandleApplyFinished()
+{
+	if (IsValid(ApplyInProgressView))
+	{
+		ApplyInProgressView->SetVisibility(ESlateVisibility::Collapsed);
 	}
 }

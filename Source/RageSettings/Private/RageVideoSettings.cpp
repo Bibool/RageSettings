@@ -358,6 +358,13 @@ bool URageVideoSettings::IsDirty() const
 	return !RageSettings::AreObjectsEqual(this, Pending);
 }
 
+bool URageVideoSettings::IsApplyInProgress() const
+{
+	return DisplayModeTickerHandle.IsValid()
+		|| DLSSFrameGenTickerHandle.IsValid()
+		|| XeSSFrameGenTickerHandle.IsValid();
+}
+
 void URageVideoSettings::SetPendingResolution(FIntPoint NewResolution)
 {
 	const bool bWasDirty = IsDirty();
