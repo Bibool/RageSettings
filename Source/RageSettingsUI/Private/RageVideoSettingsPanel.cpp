@@ -83,10 +83,13 @@ void URageVideoSettingsPanel::NativeConstruct()
 		ResolutionRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleResolutionChanged);
 	END_IF
 	
+	IF_VALID(MonitorRow)
+		MonitorRow->SetLabel(RAGE_LOC("Monitor"));
+		MonitorRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleMonitorChanged);
+	END_IF
+
 	IF_VALID(WindowModeRow)
 		WindowModeRow->SetLabel(RAGE_LOC("WindowMode"));
-		WindowModeRow->SetOptions(RageSettingsUI::BuildEnumOptionsTexts<EWindowMode::Type>(
-			{ EWindowMode::Fullscreen, EWindowMode::WindowedFullscreen, EWindowMode::Windowed }));
 		WindowModeRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleWindowModeChanged);
 	END_IF
 	
@@ -284,6 +287,8 @@ void URageVideoSettingsPanel::InitializePanel(URageSettingsSubsystem* InSubsyste
 {
 	VideoSettings = InSubsystem->GetVideoSettings();
 	RefreshResolutionOptions();
+	RefreshMonitorOptions();
+	RefreshWindowModeOptions();
 	RefreshGraphicsAPIOptions();
 	RefreshAntiAliasingOptions();
 	RefreshUpscalerModeOptions();
@@ -299,14 +304,26 @@ void URageVideoSettingsPanel::RefreshFromSettings()
 	const URageVideoSettings* Pending = VideoSettings->GetPendingSettings();
 
 	IF_VALID(ResolutionRow)
-		const int32 Index = CachedResolutions.IndexOfByKey(Pending->Resolution);
-		ResolutionRow->SetSelectedIndex(Index != INDEX_NONE ? Index : 0);
+		/* Falls back to the largest mode rather than to index 0. A staged resolution the current monitor
+		 * cannot show used to land on the smallest entry in the list, which both misreported the pending
+		 * value and read as the settings menu volunteering 1024x768. Staging keeps the two in step now,
+		 * so this only covers a config carrying a resolution no attached display has. */
+		int32 Index = CachedResolutions.IndexOfByKey(Pending->Resolution);
+		if (Index == INDEX_NONE)
+		{
+			Index = FMath::Max(CachedResolutions.IndexOfByKey(VideoSettings->GetLargestSupportedResolution()), 0);
+		}
+		ResolutionRow->SetSelectedIndex(Index);
+	END_IF
+
+	IF_VALID(MonitorRow)
+		MonitorRow->SetSelectedIndex(FMath::Max(CachedMonitorIds.IndexOfByKey(Pending->PreferredMonitorId), 0));
 	END_IF
 
 	RefreshResolutionRowEnabled();
 	
 	IF_VALID(WindowModeRow)
-		WindowModeRow->SetSelectedIndex(static_cast<int32>(Pending->WindowMode.GetValue()));
+		WindowModeRow->SetSelectedIndex(FMath::Max(SupportedWindowModes.IndexOfByKey(Pending->WindowMode.GetValue()), 0));
 	END_IF
 
 	IF_VALID(VSyncRow)
@@ -485,6 +502,46 @@ void URageVideoSettingsPanel::RefreshGraphicsAPIOptions()
 		SelectableRHITypes = VideoSettings->GetSelectableRHITypes();
 		GraphicsAPIRow->SetOptions(RageSettingsUI::BuildEnumOptionsTexts(SelectableRHITypes));
 		GraphicsAPIRow->SetVisibility(SelectableRHITypes.Num() > 1 ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	END_IF
+}
+
+void URageVideoSettingsPanel::RefreshMonitorOptions()
+{
+	IF_VALID(MonitorRow)
+		CachedMonitorIds.Reset();
+
+		TArray<FString> Options;
+		int32 DisplayIndex = 0;
+		for (const FRageMonitorInfo& Monitor : VideoSettings->GetAvailableMonitors())
+		{
+			++DisplayIndex;
+			CachedMonitorIds.Add(Monitor.Id);
+			
+			const FString Label = Monitor.Name.IsEmpty()
+				? FString::Printf(TEXT("[%d]"), DisplayIndex - 1)
+				: FString::Printf(TEXT("%s [%d]"), *Monitor.Name, DisplayIndex - 1);
+
+			Options.Add(Label);
+		}
+
+		MonitorRow->SetOptions(Options);
+
+		MonitorRow->SetVisibility(VideoSettings->IsMonitorSelectionSupported()
+			? ESlateVisibility::Visible
+			: ESlateVisibility::Collapsed);
+	END_IF
+}
+
+void URageVideoSettingsPanel::RefreshWindowModeOptions()
+{
+	IF_VALID(WindowModeRow)
+		SupportedWindowModes.Reset();
+		for (const TEnumAsByte<EWindowMode::Type>& Mode : VideoSettings->GetAvailableWindowModes())
+		{
+			SupportedWindowModes.Add(Mode.GetValue());
+		}
+
+		WindowModeRow->SetOptions(RageSettingsUI::BuildEnumOptionsTexts(SupportedWindowModes));
 	END_IF
 }
 
@@ -731,10 +788,25 @@ void URageVideoSettingsPanel::HandleResolutionChanged(FName RowId, FRageVariant 
 	}
 }
 
+void URageVideoSettingsPanel::HandleMonitorChanged(FName RowId, FRageVariant NewIndex)
+{
+	if (CachedMonitorIds.IsValidIndex(NewIndex.Get<int32>()))
+	{
+		VideoSettings->SetPendingMonitorId(CachedMonitorIds[NewIndex.Get<int32>()]);
+		
+		RefreshWindowModeOptions();
+		RefreshResolutionOptions();
+		RefreshFromSettings();
+	}
+}
+
 void URageVideoSettingsPanel::HandleWindowModeChanged(FName RowId, FRageVariant NewIndex)
 {
-	VideoSettings->SetPendingWindowMode(static_cast<EWindowMode::Type>(NewIndex.Get<int32>()));
-	RefreshResolutionRowEnabled(); // borderless takes its size from the desktop, not from this setting
+	if (SupportedWindowModes.IsValidIndex(NewIndex.Get<int32>()))
+	{
+		VideoSettings->SetPendingWindowMode(SupportedWindowModes[NewIndex.Get<int32>()]);
+		RefreshResolutionRowEnabled(); // borderless takes its size from the desktop, not from this setting
+	}
 }
 
 void URageVideoSettingsPanel::HandleVSyncChanged(FName RowId, FRageVariant bNewValue)

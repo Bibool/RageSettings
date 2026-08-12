@@ -7,6 +7,7 @@
 #include "RageAntiAliasingMethod.h"
 #include "RageFeatureSupport.h"
 #include "RageHDRDisplayNits.h"
+#include "RageMonitorInfo.h"
 #include "RageMSAASampleCount.h"
 #include "RageQualityPreset.h"
 #include "RageRayTracingSettings.h"
@@ -55,6 +56,9 @@ public:
 #pragma region SETTERS
 	UFUNCTION(BlueprintCallable, Category = "Rage|Video")
 	void SetPendingResolution(FIntPoint NewResolution);
+
+	UFUNCTION(BlueprintCallable, Category = "Rage|Video")
+	void SetPendingMonitorId(const FString& NewMonitorId);
 
 	UFUNCTION(BlueprintCallable, Category = "Rage|Video")
 	void SetPendingWindowMode(EWindowMode::Type NewMode);
@@ -108,6 +112,18 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Rage|Video")
 	TArray<FIntPoint> GetSupportedResolutions() const;
+	
+	UFUNCTION(BlueprintPure, Category = "Rage|Video")
+	FIntPoint GetLargestSupportedResolution() const;
+
+	UFUNCTION(BlueprintPure, Category = "Rage|Video")
+	TArray<FRageMonitorInfo> GetAvailableMonitors() const;
+	
+	UFUNCTION(BlueprintPure, Category = "Rage|Video")
+	TArray<TEnumAsByte<EWindowMode::Type>> GetAvailableWindowModes() const;
+
+	UFUNCTION(BlueprintPure, Category = "Rage|Video")
+	bool IsMonitorSelectionSupported() const;
 
 	UFUNCTION(BlueprintCallable, Category = "Rage|Video")
 	void SetPendingQualityPreset(ERageQualityPreset NewPreset);
@@ -210,6 +226,9 @@ public:
 	
 	UFUNCTION(BlueprintPure, Category = "Rage|Video")
 	bool IsRestartRequiredForFrameGeneration() const;
+	
+	UFUNCTION(BlueprintPure, Category = "Rage|Video")
+	bool IsRestartRequiredForMonitor() const;
 
 	UFUNCTION(BlueprintPure, Category = "Rage|Video")
 	bool IsRestartRequired() const;
@@ -226,6 +245,9 @@ public:
 
 	UPROPERTY(Config, BlueprintReadWrite, Category = "Rage|Video|Display")
 	FIntPoint Resolution = FIntPoint(1920, 1080);
+	
+	UPROPERTY(Config, BlueprintReadWrite, Category = "Rage|Video|Display")
+	FString PreferredMonitorId;
 
 	UPROPERTY(Config, BlueprintReadWrite, Category = "Rage|Video|Display")
 	TEnumAsByte<EWindowMode::Type> WindowMode = EWindowMode::WindowedFullscreen;
@@ -327,6 +349,10 @@ private:
 	void ApplyAntiAliasingCVars();
 	void ClampAntiAliasingMethodToSupported();
 	void ApplyPreferredRHI();
+	void ApplyPreferredMonitor();
+	void ClampResolutionToMonitor(const FString& MonitorId);
+	void ClampWindowModeToAvailable();
+	void DeferredReapplyDisplayMode();
 	void DeferredApplyStartupSettings();
 	void ReconcilePreferredRHIWithActual();
 	void BroadcastDirtyIfChanged(bool bWasDirtyBefore);
@@ -339,4 +365,5 @@ private:
 	FTSTicker::FDelegateHandle DLSSFrameGenTickerHandle;
 	FTSTicker::FDelegateHandle XeSSFrameGenTickerHandle;
 	FTSTicker::FDelegateHandle StartupApplyTickerHandle;
+	FTSTicker::FDelegateHandle DisplayModeTickerHandle;
 };

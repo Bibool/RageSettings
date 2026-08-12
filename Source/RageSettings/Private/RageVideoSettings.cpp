@@ -4,10 +4,12 @@
 #include "RageVideoSettings.h"
 
 #include "RageSettingsDeveloperSettings.h"
+#include "RageMonitorSupport.h"
 #include "RageRHISupport.h"
 #include "RageScalabilityCategory.h"
 #include "RageSettingsReflectionUtils.h"
 #include "RHI.h"
+#include "UnrealEngine.h"
 #include "RenderUtils.h"
 #include "SceneUtils.h"
 #include "Scalability.h"
@@ -312,6 +314,8 @@ void URageVideoSettings::ApplySettings()
 	RageSettings::CopyObjectProperties(this, Pending);
 	ClampUpscalerMethodToSupported(Upscaler);
 	PushCurrentIntoEngineProperties();
+	
+	ApplyPreferredMonitor();
 
 	Super::ApplySettings(false);
 
@@ -361,11 +365,46 @@ void URageVideoSettings::SetPendingResolution(FIntPoint NewResolution)
 	BroadcastDirtyIfChanged(bWasDirty);
 }
 
+void URageVideoSettings::SetPendingMonitorId(const FString& NewMonitorId)
+{
+	const bool bWasDirty = IsDirty();
+	Pending->PreferredMonitorId = NewMonitorId;
+	
+	if (const FIntPoint Largest = GetLargestSupportedResolution(); Largest.X > 0 && Largest.Y > 0)
+	{
+		Pending->Resolution = Largest;
+	}
+
+	BroadcastDirtyIfChanged(bWasDirty);
+}
+
 void URageVideoSettings::SetPendingWindowMode(EWindowMode::Type NewMode)
 {
+	if (!GetAvailableWindowModes().Contains(NewMode))
+	{
+		S_LOG(Warning, "Rage Settings: refusing an unavailable window mode for the selected monitor.");
+		return;
+	}
+
 	const bool bWasDirty = IsDirty();
 	Pending->WindowMode = NewMode;
 	BroadcastDirtyIfChanged(bWasDirty);
+}
+
+/* Selecting a secondary display retires exclusive fullscreen, so a stored Fullscreen has to go
+ * somewhere - borderless is the closest thing that still fills the screen. */
+void URageVideoSettings::ClampWindowModeToAvailable()
+{
+	const TArray<TEnumAsByte<EWindowMode::Type>> Modes = GetAvailableWindowModes();
+	if (IsValid(Pending) && !Modes.Contains(Pending->WindowMode))
+	{
+		Pending->WindowMode = EWindowMode::WindowedFullscreen;
+	}
+
+	if (!Modes.Contains(WindowMode))
+	{
+		WindowMode = EWindowMode::WindowedFullscreen;
+	}
 }
 
 void URageVideoSettings::SetPendingVSyncEnabled(bool bEnabled)
@@ -489,7 +528,59 @@ TArray<FIntPoint> URageVideoSettings::GetSupportedResolutions() const
 {
 	TArray<FIntPoint> Resolutions;
 	UKismetSystemLibrary::GetSupportedFullscreenResolutions(Resolutions);
+	
+	const FString MonitorId = IsValid(Pending) ? Pending->PreferredMonitorId : PreferredMonitorId;
+	const TArray<FRageMonitorInfo> Monitors = RageMonitor::GetMonitors();
+	const FRageMonitorInfo* Target = Monitors.FindByPredicate(
+		[&MonitorId](const FRageMonitorInfo& Monitor) { return Monitor.Id == MonitorId; });
+
+	if (Target && Target->NativeResolution.X > 0 && Target->NativeResolution.Y > 0)
+	{
+		Resolutions.RemoveAll([Target](const FIntPoint& Resolution)
+		{
+			return Resolution.X > Target->NativeResolution.X || Resolution.Y > Target->NativeResolution.Y;
+		});
+	}
+
 	return Resolutions;
+}
+
+FIntPoint URageVideoSettings::GetLargestSupportedResolution() const
+{
+	FIntPoint Largest = FIntPoint::ZeroValue;
+	for (const FIntPoint& Candidate : GetSupportedResolutions())
+	{
+		if (Candidate.X * Candidate.Y > Largest.X * Largest.Y)
+		{
+			Largest = Candidate;
+		}
+	}
+
+	return Largest;
+}
+
+TArray<FRageMonitorInfo> URageVideoSettings::GetAvailableMonitors() const
+{
+	return RageMonitor::GetMonitors();
+}
+
+TArray<TEnumAsByte<EWindowMode::Type>> URageVideoSettings::GetAvailableWindowModes() const
+{
+	TArray<TEnumAsByte<EWindowMode::Type>> Modes = { EWindowMode::WindowedFullscreen, EWindowMode::Windowed };
+
+	const FString MonitorId = IsValid(Pending) ? Pending->PreferredMonitorId : PreferredMonitorId;
+	const TArray<FRageMonitorInfo> Monitors = RageMonitor::GetMonitors();
+	const FRageMonitorInfo* Target = Monitors.FindByPredicate(
+		[&MonitorId](const FRageMonitorInfo& Monitor) { return Monitor.Id == MonitorId; });
+	
+	Modes.Insert(EWindowMode::Fullscreen, 0);
+
+	return Modes;
+}
+
+bool URageVideoSettings::IsMonitorSelectionSupported() const
+{
+	return RageMonitor::IsSelectionSupported();
 }
 
 void URageVideoSettings::SetPendingQualityPreset(ERageQualityPreset NewPreset)
@@ -883,7 +974,7 @@ bool URageVideoSettings::IsRestartRequiredForFrameGeneration() const
 
 bool URageVideoSettings::IsRestartRequired() const
 {
-	return IsRestartRequiredForRHI() || IsRestartRequiredForFrameGeneration();
+	return IsRestartRequiredForRHI() || IsRestartRequiredForFrameGeneration() || IsRestartRequiredForMonitor();
 }
 
 void URageVideoSettings::PushCurrentIntoEngineProperties()
@@ -1021,6 +1112,8 @@ void URageVideoSettings::DeferredApplyStartupSettings()
 		[this](float) -> bool
 		{
 			ClampUpscalerMethodToSupported(Upscaler);
+			
+			ApplyPreferredMonitor();
 
 			Scalability::SetQualityLevels(ScalabilityQuality);
 
@@ -1039,6 +1132,108 @@ void URageVideoSettings::DeferredApplyStartupSettings()
 
 			return false;
 		}));
+}
+
+void URageVideoSettings::ApplyPreferredMonitor()
+{
+	if (!RageMonitor::IsSelectionSupported())
+	{
+		return;
+	}
+
+	PreferredMonitorId = RageMonitor::ResolveMonitorId(PreferredMonitorId);
+	
+	ClampWindowModeToAvailable();
+	ClampResolutionToMonitor(PreferredMonitorId);
+
+	if (RageMonitor::MoveGameWindowToMonitor(PreferredMonitorId))
+	{
+		DeferredReapplyDisplayMode();
+	}
+}
+
+void URageVideoSettings::ClampResolutionToMonitor(const FString& MonitorId)
+{
+	const TArray<FRageMonitorInfo> Monitors = RageMonitor::GetMonitors();
+	const FRageMonitorInfo* Target = Monitors.FindByPredicate(
+		[&MonitorId](const FRageMonitorInfo& Monitor) { return Monitor.Id == MonitorId; });
+
+	if (!Target || Target->NativeResolution.X <= 0 || Target->NativeResolution.Y <= 0)
+	{
+		return;
+	}
+	
+	FIntPoint Adapted = Target->NativeResolution;
+
+	if (WindowMode != EWindowMode::WindowedFullscreen)
+	{
+		const bool bFitsTarget = Resolution.X <= Target->NativeResolution.X && Resolution.Y <= Target->NativeResolution.Y;
+		if (bFitsTarget)
+		{
+			Adapted = Resolution;
+		}
+		else
+		{
+			for (const FIntPoint& Candidate : GetSupportedResolutions())
+			{
+				if (Candidate.X <= Target->NativeResolution.X && Candidate.Y <= Target->NativeResolution.Y
+					&& Candidate.X * Candidate.Y > Adapted.X * Adapted.Y)
+				{
+					Adapted = Candidate;
+				}
+			}
+		}
+	}
+
+	if (Adapted == Resolution)
+	{
+		return;
+	}
+
+	S_LOG(Log, "Rage Settings: adapting resolution to the selected monitor.");
+
+	Resolution = Adapted;
+	if (IsValid(Pending))
+	{
+		Pending->Resolution = Adapted;
+	}
+
+	SetScreenResolution(Resolution);
+}
+
+void URageVideoSettings::DeferredReapplyDisplayMode()
+{
+	FTSTicker::RemoveTicker(DisplayModeTickerHandle);
+	DisplayModeTickerHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this,
+		[this](float) -> bool
+		{
+			GSystemResolution.bForceRefresh = true;
+			ApplyResolutionSettings(false);
+			
+			const FIntPoint ViewportSize = GEngine && IsValid(GEngine->GameViewport) && GEngine->GameViewport->Viewport
+				? GEngine->GameViewport->Viewport->GetSizeXY()
+				: FIntPoint::ZeroValue;
+
+			const TSharedPtr<SWindow> Window = GEngine && IsValid(GEngine->GameViewport) ? GEngine->GameViewport->GetWindow() : nullptr;
+			const FString WindowSize = Window.IsValid()
+				? FString::Printf(TEXT("%gx%g @ %g,%g"),
+					Window->GetSizeInScreen().X, Window->GetSizeInScreen().Y,
+					Window->GetPositionInScreen().X, Window->GetPositionInScreen().Y)
+				: TEXT("<no window>");
+
+			S_LOG(Log, "Rage Settings: display mode re-applied at {res} (mode {mode}); window {window}, viewport {viewport}.",
+				FString::Printf(TEXT("%dx%d"), GSystemResolution.ResX, GSystemResolution.ResY),
+				StaticCast<int32>(GSystemResolution.WindowMode),
+				WindowSize,
+				FString::Printf(TEXT("%dx%d"), ViewportSize.X, ViewportSize.Y));
+
+			return false;
+		}));
+}
+
+bool URageVideoSettings::IsRestartRequiredForMonitor() const
+{
+	return false;
 }
 
 void URageVideoSettings::ApplyPreferredRHI()

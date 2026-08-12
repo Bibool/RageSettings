@@ -52,8 +52,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly) 
 	TSubclassOf<URageRowBaseUserWidget> ScalabilityRowClass = nullptr;
 	
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional)) 
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<URageComboRow> ResolutionRow = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<URageComboRow> MonitorRow = nullptr;
 	
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional)) 
 	TObjectPtr<URageSelectionRow> WindowModeRow = nullptr;
@@ -165,6 +168,8 @@ private:
 	void RefreshScalabilityRows();
 	void RefreshQualityPresetRow();
 	void RefreshResolutionOptions();
+	void RefreshMonitorOptions();
+	void RefreshWindowModeOptions();
 	void RefreshGraphicsAPIOptions();
 	void RefreshResolutionRowEnabled();
 	void RefreshAntiAliasingOptions();
@@ -177,6 +182,7 @@ private:
 	void ModifyPendingUpscaler(TFunctionRef<void(FRageUpscalerSettings&)> Mutator);
 
 	void HandleResolutionChanged(FName RowId, FRageVariant NewIndex);
+	void HandleMonitorChanged(FName RowId, FRageVariant NewIndex);
 	void HandleWindowModeChanged(FName RowId, FRageVariant NewIndex);
 	void HandleVSyncChanged(FName RowId, FRageVariant bNewValue);
 	void HandleFrameRateLimitChanged(FName RowId, FRageVariant NewValue);
@@ -220,6 +226,8 @@ private:
 	
 	TMap<FName, ERageScalabilityCategory> ScalabilityCategoryByRowId;
 	TArray<FIntPoint> CachedResolutions;
+	TArray<FString> CachedMonitorIds;
+	TArray<EWindowMode::Type> SupportedWindowModes;
 	TArray<ERageRHIType> SelectableRHITypes;
 	TArray<ERageAntiAliasingMethod> SupportedAntiAliasingMethods;
 	TArray<ERageUpscalerMethod> SupportedUpscalerMethods;

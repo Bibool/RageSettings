@@ -30,6 +30,8 @@ public class RageSettings : ModuleRules
 		{
 			"RHI",
 			"RenderCore",
+			"ApplicationCore",
+			"SlateCore",
 			"RageSettingsShared"
 		});
 		
