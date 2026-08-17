@@ -43,6 +43,7 @@ void URageInputSettings::ResetToDefault()
 	const bool bWasDirty = IsDirty();
 	RageSettings::CopyObjectProperties(Pending, Defaults);
 	BroadcastDirtyIfChanged(bWasDirty);
+	ResetAllKeyMappingsToDefault();
 }
 
 void URageInputSettings::RevertPendingChanges()
