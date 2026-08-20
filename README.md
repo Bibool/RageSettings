@@ -610,16 +610,22 @@ that can directly manipulate the widget generated for the property, if set, it i
 
 ## Where things are saved
 
-| Category | Config file |
-|---|---|
-| Video | `GameUserSettings.ini` (standard `UGameUserSettings` location) |
-| Game | `RageGameSettings.ini` |
-| Audio | `RageAudioSettings.ini` |
-| Input (sensitivity, inversion) | `RageInputSettings.ini` |
-| Keybinds | Enhanced Input's own user settings, saved on every remap |
+| Category | Config file | Section |
+|---|---|---|
+| Video | `GameUserSettings.ini` | `[/Script/RageSettings.RageVideoSettings]` |
+| Game | `GameUserSettings.ini` | `[/Script/RageSettings.RageGameSettings]` |
+| Audio | `GameUserSettings.ini` | `[/Script/RageSettings.RageAudioSettings]` |
+| Input (sensitivity, inversion) | `GameUserSettings.ini` | `[/Script/RageSettings.RageInputSettings]` |
+| Keybinds | Enhanced Input's own user settings, saved on every remap | |
 
-All under `Saved/Config/<Platform>/` at runtime; project defaults go in
-`Config/Default<Name>.ini` as usual.
+All four categories share `GameUserSettings.ini` under `Saved/Config/<Platform>/`, one section each,
+and a subclass writes under its own class name. Project defaults go in `Config/DefaultGameUserSettings.ini`.
+
+**Do not move a category to a config file of its own.** `UCLASS(Config = MyOwnName)` looks like it
+works: the category applies, `SaveConfig()` reports success, and the values survive as long as the
+process lives, because they are copied into the class default object. Nothing reaches disk. A config
+name the engine does not already know has no branch behind it to write into, so every save is dropped
+in silence and the category reads its defaults again on the next launch.
 
 ---
 

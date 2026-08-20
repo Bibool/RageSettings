@@ -17,7 +17,7 @@ class USoundClass;
  * shared by every category - projects add their own fields by subclassing (see
  * RageSettingsDeveloperSettings::AudioSettingsClass).
  */
-UCLASS(Config = RageAudioSettings)
+UCLASS(Config = GameUserSettings)
 class RAGESETTINGS_API URageAudioSettings : public UObject, public IRageSettingsCategoryInterface
 {
 	GENERATED_BODY()

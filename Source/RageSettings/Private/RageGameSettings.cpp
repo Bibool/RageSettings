@@ -9,7 +9,7 @@
 
 void URageGameSettings::LoadSettings()
 {
-	// Current was already populated from RageGameSettings.ini by the ordinary UObject config
+	// Current was already populated from GameUserSettings.ini by the ordinary UObject config
 	// system, since its fields are declared UPROPERTY(config) - no manual LoadConfig() call needed here.
 	Pending = CastChecked<URageGameSettings>(RageSettings::CreateShadowInstance(this, this));
 	Defaults = CastChecked<URageGameSettings>(RageSettings::CreateShadowInstance(this, GetClass()->GetDefaultObject()));
