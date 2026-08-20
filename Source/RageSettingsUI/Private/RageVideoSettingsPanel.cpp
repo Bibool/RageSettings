@@ -490,8 +490,8 @@ void URageVideoSettingsPanel::RefreshResolutionOptions()
 	{
 		const FIntPoint Aspect = ResolveAspectRatio(Res);
 		Options.Add(Aspect != FIntPoint::ZeroValue
-			? FString::Printf(TEXT("%dx%d (%d:%d)"), Res.X, Res.Y, Aspect.X, Aspect.Y)
-			: FString::Printf(TEXT("%dx%d"), Res.X, Res.Y));
+			? FString::Printf(TEXT("<DefaultSettingValue>%d</><Neutral>x</><DefaultSettingValue>%d</> <Neutral>[%d:%d]</>"), Res.X, Res.Y, Aspect.X, Aspect.Y)
+			: FString::Printf(TEXT("<DefaultSettingValue>%d</><Neutral>x</><DefaultSettingValue>%d</>"), Res.X, Res.Y));
 	}
 	ResolutionRow->SetOptions(Options);
 }

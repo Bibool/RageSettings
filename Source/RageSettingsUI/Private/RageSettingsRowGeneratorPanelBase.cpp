@@ -4,7 +4,6 @@
 #include "RageSettingsRowGeneratorPanelBase.h"
 
 #include "RageComboRow.h"
-#include "RageMacros.h"
 #include "RageRowOverrideObject.h"
 #include "RageSelectionRow.h"
 #include "Components/PanelWidget.h"
@@ -13,8 +12,6 @@
 #include "RageSettingsUIDeveloperSettings.h"
 #include "RageSliderRow.h"
 #include "RageToggleRow.h"
-#include "Internationalization/StringTableCore.h"
-#include "Internationalization/StringTableRegistry.h"
 #include "UObject/UnrealType.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(RageSettingsRowGeneratorPanelBase)
@@ -39,37 +36,6 @@ namespace
 		}
 
 		return ProjectDefault;
-	}
-	
-	FText ResolveLabel(const FProperty* Property, const FRageSettingsRowDescriptor* Descriptor)
-	{
-		if (Descriptor && !Descriptor->Label.IsEmpty())
-		{
-			return Descriptor->Label;
-		}
-		
-		const URageSettingsUIDeveloperSettings* UISettings = URageSettingsUIDeveloperSettings::Get();
-		if (const FRageRowOverrideData* Override = UISettings->RowWidgetClassOverrides.Find(Property->GetFName()))
-		{
-			if (!Override->DesiredLabel.IsEmpty())
-			{
-				return Override->DesiredLabel;
-			}
-		}
-		
-		if (Property)
-		{
-			const FString PropertyStr = Property->GetFName().ToString();
-			const FStringTableConstPtr StringTable = FStringTableRegistry::Get().FindStringTable(TEXT("/RageSettings/ST_Settings.ST_Settings"));
-			if (StringTable.IsValid() && StringTable->FindEntry(PropertyStr))
-			{
-				return RAGE_LOC_Str(PropertyStr);
-			}
-			
-			return RageSettingsUI::DeriveDefaultLabel(Property);
-		}
-		
-		return FText::GetEmpty();
 	}
 	
 	void TryOverrideObjectWidgetManipulation(const FProperty* Property, URageRowBaseUserWidget* InWidget)
@@ -110,7 +76,7 @@ void URageSettingsRowGeneratorPanelBase::BuildRows(UPanelWidget* Container, UObj
 		const FRageSettingsRowDescriptor* Descriptor = Descriptors.FindByPredicate(
 			[Property](const FRageSettingsRowDescriptor& Candidate) { return Candidate.PropertyName == Property->GetFName(); });
 
-		const FText Label = ResolveLabel(Property, Descriptor);
+		const FText Label = RageSettingsUI::ResolveRowLabel(Property, Descriptor);
 
 		switch (Kind)
 		{
@@ -153,17 +119,7 @@ void URageSettingsRowGeneratorPanelBase::BuildRows(UPanelWidget* Container, UObj
 					Row->SetLabel(Label);
 					Row->SetRowId(Property->GetFName());
 
-					TArray<FString> Options;
-					if (const UEnum* Enum = RageSettingsUI::ResolveEnum(Property))
-					{
-						const int32 Count = Enum->NumEnums() - (Enum->ContainsExistingMax() ? 1 : 0);
-						Options.Reserve(Count);
-						for (int32 Index = 0; Index < Count; ++Index)
-						{
-							Options.Add(RageSettingsUI::DeriveDefaultEnumValueLabel(Enum, Enum->GetValueByIndex(Index)).ToString());
-						}
-					}
-					Row->SetOptions(Options);
+					Row->SetOptionTexts(RageSettingsUI::BuildEnumOptionLabels(Property));
 					Row->ValueChangedDelegate.AddUObject(this, &URageSettingsRowGeneratorPanelBase::HandleGeneratedComboChanged);
 					TryOverrideObjectWidgetManipulation(Property, Row);
 					Container->AddChild(Row);
@@ -178,17 +134,7 @@ void URageSettingsRowGeneratorPanelBase::BuildRows(UPanelWidget* Container, UObj
 					Row->SetLabel(Label);
 					Row->SetRowId(Property->GetFName());
 
-					TArray<FText> Options;
-					if (const UEnum* Enum = RageSettingsUI::ResolveEnum(Property))
-					{
-						const int32 Count = Enum->NumEnums() - (Enum->ContainsExistingMax() ? 1 : 0);
-						Options.Reserve(Count);
-						for (int32 Index = 0; Index < Count; ++Index)
-						{
-							Options.Add(RageSettingsUI::DeriveDefaultEnumValueLabel(Enum, Enum->GetValueByIndex(Index)));
-						}
-					}
-					Row->SetOptions(Options);
+					Row->SetOptions(RageSettingsUI::BuildEnumOptionLabels(Property));
 					Row->ValueChangedDelegate.AddUObject(this, &URageSettingsRowGeneratorPanelBase::HandleGeneratedSelectionChanged);
 					TryOverrideObjectWidgetManipulation(Property, Row);
 					Container->AddChild(Row);

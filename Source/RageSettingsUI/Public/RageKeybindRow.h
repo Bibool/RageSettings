@@ -30,6 +30,12 @@ public:
 	
 	UFUNCTION(BlueprintPure, Category = "Rage|UI") 
 	bool IsListeningForInput() const;
+	
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnKeyTextSet(const FText& NewKeyText);
+	
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnLabelTextSet(const FText& NewLabelText);
 
 	UPROPERTY(BlueprintAssignable, Category = "Rage|Delegates") 
 	FRageKeybindRowChanged KeyRemappedDelegate;

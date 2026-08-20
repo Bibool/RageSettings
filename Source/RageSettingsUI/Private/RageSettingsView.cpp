@@ -18,8 +18,16 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(RageSettingsView)
 
+void URageSettingsView::CycleCategory(int32 Direction)
+{
+	int32 NextIndex = (StaticCast<int32>(ActiveCategory) + Direction + RageSettingsCategory::Count) % RageSettingsCategory::Count;
+	ShowCategory(StaticCast<ERageSettingsCategory>(NextIndex));
+}
+
 void URageSettingsView::ShowCategory(ERageSettingsCategory Category)
 {
+	ERageSettingsCategory LastCategory = ActiveCategory;
+	
 	ActiveCategory = Category;
 
 	if (UUserWidget* TargetPanel = GetPanelFor(Category))
@@ -29,6 +37,8 @@ void URageSettingsView::ShowCategory(ERageSettingsCategory Category)
 
 	/* Refresh panel to force showing the current settings. */
 	RefreshPanel(Category);
+	
+	OnCategorySelected(LastCategory, Category);
 }
 
 void URageSettingsView::RequestClose()
@@ -160,7 +170,9 @@ void URageSettingsView::RefreshDirtyMarkers()
 
 void URageSettingsView::RefreshApplyButtonEnabled()
 {
-	ApplyButton->SetIsEnabled(Subsystem->HasAnyDirtySettings());
+	const bool bNewState = Subsystem->HasAnyDirtySettings();
+	ApplyButton->SetIsEnabled(bNewState);
+	OnButtonDisabled(ApplyButton, bNewState);
 }
 
 void URageSettingsView::HandleVisibilityChanged(const ESlateVisibility NewVisibility)

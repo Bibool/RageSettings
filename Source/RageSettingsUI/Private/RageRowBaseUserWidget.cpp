@@ -43,10 +43,12 @@ void URageRowBaseUserWidget::NativePreConstruct()
 
 void URageRowBaseUserWidget::RefreshLabel()
 {
-	if (!IsValid(Label))
-	{
-		return;
-	}
+	const FText DesiredText = DisabledReason.IsEmpty() ? LabelText : FText::Format(DisabledReasonFormat, LabelText, DisabledReason);
 
-	Label->SetText(DisabledReason.IsEmpty() ? LabelText : FText::Format(DisabledReasonFormat, LabelText, DisabledReason));
+	if (IsValid(Label))
+	{
+		Label->SetText(DesiredText);
+	}
+	
+	OnLabelTextSet(DesiredText);
 }

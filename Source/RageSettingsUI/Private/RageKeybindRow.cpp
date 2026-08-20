@@ -14,13 +14,16 @@ void URageKeybindRow::Setup(FName InMappingName, const FText& NewLabel)
 	MappingName = InMappingName;
 
 	Label->SetText(NewLabel);
+	OnLabelTextSet(NewLabel);
 }
 
 void URageKeybindRow::SetCurrentKey(FKey NewKey)
 {
 	CurrentKey = NewKey;
 	
-	KeyText->SetText(NewKey.IsValid() ? NewKey.GetDisplayName() : RAGE_LOC("KeyUnbound"));
+	const FText DesiredText = NewKey.IsValid() ? NewKey.GetDisplayName() : RAGE_LOC("KeyUnbound");
+	KeyText->SetText(DesiredText);
+	OnKeyTextSet(DesiredText);
 }
 
 FName URageKeybindRow::GetMappingName() const
@@ -106,7 +109,9 @@ void URageKeybindRow::BeginListening()
 {
 	bListeningForInput = true;
 
-	KeyText->SetText(RAGE_LOC("PressAnyKey"));
+	const FText DesiredText = RAGE_LOC("PressAnyKey");
+	KeyText->SetText(DesiredText);
+	OnKeyTextSet(DesiredText);
 
 	SetButtonsEnabled(false);
 	SetKeyboardFocus();

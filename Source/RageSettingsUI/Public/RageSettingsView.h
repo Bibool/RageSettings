@@ -45,6 +45,9 @@ class RAGESETTINGSUI_API URageSettingsView : public UUserWidget
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "Rage|Settings|View")
+	void CycleCategory(int32 Direction);
+	
+	UFUNCTION(BlueprintCallable, Category = "Rage|Settings|View")
 	void ShowCategory(ERageSettingsCategory Category);
 
 	/** Requests the view close. If nothing is pending, fires OnViewClosed immediately; if there
@@ -57,6 +60,12 @@ public:
 	 *  automatically on construction and whenever this widget is made visible again. */
 	UFUNCTION(BlueprintCallable, Category = "Rage|Settings|View")
 	void RefreshAll();
+	
+	UFUNCTION(BlueprintImplementableEvent, Category = "Rage|Settings|View")
+	void OnCategorySelected(ERageSettingsCategory LastCategory, ERageSettingsCategory NewCategory);
+	
+	UFUNCTION(BlueprintImplementableEvent, Category = "Rage|Settings|View")
+	void OnButtonDisabled(UWidget* InButton, bool bNewState);
 
 	/** Fires once it is actually safe to remove this widget. This view excepts to have its visibility or parentship managed (collapsed/removed) */
 	UPROPERTY(BlueprintAssignable, Category = "Rage|Settings|View")
@@ -189,7 +198,10 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<URageSettingsSubsystem> Subsystem = nullptr;
-
+	
+	UPROPERTY()
+	TObjectPtr<UUserWidget> LastTab = nullptr;
+	
 	TMap<ERageSettingsCategory, TWeakObjectPtr<UWidget>> DirtyMarkers;
 
 	ERageSettingsCategory ActiveCategory = ERageSettingsCategory::Video;

@@ -53,6 +53,16 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, Category = "Rage|UI")
 	TMap<FName, FRageRowOverrideData> RowWidgetClassOverrides;
+
+	/** String tables a generated row searches for its label and its enum option names, after the one
+	 * this plugin ships. A project points this at its own table so the fields and enums it adds by
+	 * subclassing can be translated without anyone editing an asset inside the plugin.
+	 *
+	 * Labels are keyed by the property name ("Culture"), options by either the enum entry name
+	 * ("French") or that name scoped to its enum ("ERageCultures_French"), which is what to reach for
+	 * when two enums share an entry name. */
+	UPROPERTY(Config, EditAnywhere, Category = "Rage|UI")
+	TArray<FName> AdditionalStringTables;
 	
 	/* Which Scalability settings to generate. */
 	UPROPERTY(Config, EditAnywhere, EditFixedSize, Category = "Rage|Video")

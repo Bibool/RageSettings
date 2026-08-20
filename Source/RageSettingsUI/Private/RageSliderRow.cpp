@@ -59,25 +59,29 @@ void URageSliderRow::HandleSliderValueChanged(float NewValue)
 
 void URageSliderRow::RefreshValueText_Implementation(float Value)
 {
-	if (!IsValid(ValueText))
-	{
-		return;
-	}
-
+	FText DesiredText;
+	
 	switch (DisplayFormat)
 	{
 		case ERageSliderDisplayFormat::Percent:
-			ValueText->SetText(FText::AsPercent(Value));
+			DesiredText = FText::AsPercent(Value);
 			break;
 		case ERageSliderDisplayFormat::Multiplier:
-			ValueText->SetText(FText::FromString(FString::Printf(TEXT("%.2fx"), Value)));
+			DesiredText = FText::FromString(FString::Printf(TEXT("%.2fx"), Value));
 			break;
 		case ERageSliderDisplayFormat::Integer:
-			ValueText->SetText(FText::AsNumber(FMath::RoundToInt(Value)));
+			DesiredText = FText::AsNumber(FMath::RoundToInt(Value));
 			break;
 		case ERageSliderDisplayFormat::Raw:
 		default:
-			ValueText->SetText(FText::FromString(FString::Printf(TEXT("%.2f"), Value)));
+			DesiredText = FText::FromString(FString::Printf(TEXT("%.2f"), Value));
 			break;
 	}
+	
+	if (IsValid(ValueText))
+	{
+		ValueText->SetText(DesiredText);
+	}
+
+	OnValueTextSet(DesiredText);
 }

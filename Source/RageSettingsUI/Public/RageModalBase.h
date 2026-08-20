@@ -27,6 +27,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Rage|UI")
 	void SetMessage(const FText& NewMessage);
+	
+	UFUNCTION(BlueprintImplementableEvent, Category = "Rage|UI")
+	void OnMessageSet(const FText& NewMessage);
 
 protected:
 	virtual void NativeConstruct() override;

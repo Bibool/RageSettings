@@ -42,6 +42,8 @@ void URageModalBase::SetMessage(const FText& NewMessage)
 	{
 		MessageText->SetText(NewMessage);
 	}
+	
+	OnMessageSet(NewMessage);
 }
 
 void URageModalBase::NativeConstruct()

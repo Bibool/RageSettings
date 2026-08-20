@@ -11,3 +11,8 @@ enum class ERageSettingsCategory : uint8
 	Video,
 	Input
 };
+
+namespace RageSettingsCategory
+{
+	constexpr int32 Count = 4;
+}

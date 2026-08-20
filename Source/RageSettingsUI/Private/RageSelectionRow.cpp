@@ -67,10 +67,13 @@ void URageSelectionRow::NativeConstruct()
 
 void URageSelectionRow::RefreshSelection_Implementation()
 {
+	const FText Text = Options.IsValidIndex(SelectedIndex) ? Options[SelectedIndex] : FText::GetEmpty();
 	if (IsValid(ValueText))
 	{
-		ValueText->SetText(Options.IsValidIndex(SelectedIndex) ? Options[SelectedIndex] : FText::GetEmpty());
+		ValueText->SetText(Text);
 	}
+	
+	OnValueTextSet(Text);
 	
 	const bool bCanCycle = Options.Num() > 1;
 	Left_Button->SetIsEnabled(bCanCycle && (bWrapAround || SelectedIndex > 0));

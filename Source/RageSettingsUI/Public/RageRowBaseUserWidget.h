@@ -33,6 +33,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Rage|UI")
 	const FText& GetDisabledReason() const { return DisabledReason; }
+	
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnValueTextSet(const FText& NewValue);
+	
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnLabelTextSet(const FText& NewValue);
 
 	FRageValueChanged ValueChangedDelegate;
 
@@ -51,7 +57,7 @@ protected:
 private:
 	void RefreshLabel();
 
-	UPROPERTY(Transient, BlueprintReadOnly, meta=(BindWidget, AllowPrivateAccess="true"))
+	UPROPERTY(Transient, BlueprintReadOnly, meta=(BindWidgetOptional, AllowPrivateAccess="true"))
 	TObjectPtr<UTextBlock> Label = nullptr;
 
 	FText DisabledReason = FText::GetEmpty();
