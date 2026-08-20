@@ -45,6 +45,9 @@ class RAGESETTINGSUI_API URageSettingsView : public UUserWidget
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "Rage|Settings|View")
+	void CycleCategory(int32 Direction);
+	
+	UFUNCTION(BlueprintCallable, Category = "Rage|Settings|View")
 	void ShowCategory(ERageSettingsCategory Category);
 
 	/** Requests the view close. If nothing is pending, fires OnViewClosed immediately; if there
@@ -121,6 +124,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<URageConfirmModal> RestartRequiredModal = nullptr;
 	
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional)) 
+	TObjectPtr<UUserWidget> ApplyInProgressView = nullptr;
+	
 	UPROPERTY(EditDefaultsOnly)
 	ERageSettingsCategory DefaultCategory = ERageSettingsCategory::Video;
 
@@ -133,8 +139,7 @@ private:
 	void RefreshDirtyMarkers();
 	void RefreshApplyButtonEnabled();
 	void CloseImmediately();
-
-
+	
 	void HandleVisibilityChanged(ESlateVisibility NewVisibility);
 
 	UFUNCTION() 
@@ -178,10 +183,16 @@ private:
 
 	UFUNCTION()
 	void HandleRestartDeclined();
+	
+	UFUNCTION()
+	void HandleApplyStarted();
+	
+	UFUNCTION()
+	void HandleApplyFinished();
 
 	UPROPERTY()
 	TObjectPtr<URageSettingsSubsystem> Subsystem = nullptr;
-
+	
 	TMap<ERageSettingsCategory, TWeakObjectPtr<UWidget>> DirtyMarkers;
 
 	ERageSettingsCategory ActiveCategory = ERageSettingsCategory::Video;

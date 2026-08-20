@@ -9,6 +9,8 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FRageCategoryDirtyStateChanged, ERageSettingsCategory, Category, bool, bDirty);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FRageCategoryApplied, ERageSettingsCategory, Category);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FRageSettingsApplyStarted);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FRageSettingsApplyFinished);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FRageRestartRequirementEvaluated, bool, bRestartRequired);
 
 UINTERFACE(MinimalAPI, Blueprintable)
@@ -51,4 +53,8 @@ public:
 	 * the category can still re-derive and broadcast its dirty state. Pass IsDirty() captured
 	 * *before* that external write. */
 	virtual void NotifyPendingChangedExternally(bool bWasDirtyBefore) = 0;
+
+	/** True while ApplySettings has work still outstanding on a later tick. Categories that apply
+	 *  everything synchronously need not override this. */
+	virtual bool IsApplyInProgress() const { return false; }
 };

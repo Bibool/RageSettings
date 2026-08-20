@@ -7,7 +7,16 @@
 #include "RageSettingsCategoryInterface.h"
 #include "RageGameSettings.generated.h"
 
-UCLASS(Config = RageGameSettings)
+/**
+ * Player-profile game settings.
+ *
+ * Saved to GameUserSettings.ini alongside the video settings rather than to a file of its own. A
+ * config name the engine does not already know has no branch behind it: SaveConfig() works out the
+ * right path, writes into nothing, and reports success, so the category applies for the session and
+ * is back to its defaults on the next launch. GameUserSettings is a known name, and is where a
+ * player's machine-local choices belong anyway. Each category still keeps its own section.
+ */
+UCLASS(Config = GameUserSettings)
 class RAGESETTINGS_API URageGameSettings : public UObject, public IRageSettingsCategoryInterface
 {
 	GENERATED_BODY()

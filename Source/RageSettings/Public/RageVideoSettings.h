@@ -50,6 +50,7 @@ public:
 	virtual bool IsDirty() const override;
 	virtual void NotifyPendingChangedExternally(bool bWasDirtyBefore) override { BroadcastDirtyIfChanged(bWasDirtyBefore); }
 	virtual ERageSettingsCategory GetCategoryId() const override { return ERageSettingsCategory::Video; }
+	virtual bool IsApplyInProgress() const override;
 //~ End IRageSettingsCategory
 
 #pragma region SETTERS

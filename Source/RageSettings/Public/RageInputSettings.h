@@ -15,7 +15,7 @@ class ULocalPlayer;
 /**
  * Input settings only support local player (index 0) and thus only single screen games.
  * It also doesn't support multiple player profiles, nor does it support secondary keybinds. */
-UCLASS(Config = RageInputSettings)
+UCLASS(Config = GameUserSettings)
 class RAGESETTINGS_API URageInputSettings : public UObject, public IRageSettingsCategoryInterface
 {
 	GENERATED_BODY()

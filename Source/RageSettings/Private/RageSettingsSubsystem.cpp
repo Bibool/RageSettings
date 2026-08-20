@@ -59,6 +59,7 @@ void URageSettingsSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 void URageSettingsSubsystem::Deinitialize()
 {
 	FTSTicker::RemoveTicker(RestartCheckTickerHandle);
+	FTSTicker::RemoveTicker(ApplySettledTickerHandle);
 
 	VideoSettings->DirtyStateChangedDelegate.RemoveAll(this);
 	AudioSettings->DirtyStateChangedDelegate.RemoveAll(this);
@@ -112,6 +113,8 @@ URageInputSettings* URageSettingsSubsystem::GetInputSettings() const
 
 void URageSettingsSubsystem::ApplyAllDirtySettings()
 {
+	BeginApply();
+
 	for (const TScriptInterface<IRageSettingsCategoryInterface>& Category : AllCategories)
 	{
 		if (Category && Category->IsDirty())
@@ -123,6 +126,7 @@ void URageSettingsSubsystem::ApplyAllDirtySettings()
 	}
 
 	DeferredEvaluateRestartRequirement();
+	EndApplyWhenSettled();
 }
 
 void URageSettingsSubsystem::SaveAllSettings()
@@ -138,6 +142,8 @@ void URageSettingsSubsystem::SaveAllSettings()
 
 void URageSettingsSubsystem::ApplyAndSaveAllDirtySettings()
 {
+	BeginApply();
+
 	for (const TScriptInterface<IRageSettingsCategoryInterface>& Category : AllCategories)
 	{
 		if (Category && Category->IsDirty())
@@ -148,8 +154,9 @@ void URageSettingsSubsystem::ApplyAndSaveAllDirtySettings()
 			CategoryAppliedDelegate.Broadcast(Id);
 		}
 	}
-	
+
 	DeferredEvaluateRestartRequirement();
+	EndApplyWhenSettled();
 }
 
 void URageSettingsSubsystem::RevertAllPendingChanges()
@@ -175,16 +182,24 @@ void URageSettingsSubsystem::ResetCategoryToDefault(ERageSettingsCategory Catego
 
 	if (bApplyImmediately && Target->IsDirty())
 	{
+		BeginApply();
+
 		Target->ApplySettings();
 		Target->SaveSettings();
 		CategoryAppliedDelegate.Broadcast(Category);
-		
+
 		DeferredEvaluateRestartRequirement();
+		EndApplyWhenSettled();
 	}
 }
 
 void URageSettingsSubsystem::ResetAllCategoriesToDefault(bool bApplyImmediately)
 {
+	if (bApplyImmediately)
+	{
+		BeginApply();
+	}
+
 	for (const TScriptInterface<IRageSettingsCategoryInterface>& Category : AllCategories)
 	{
 		if (!Category)
@@ -206,6 +221,7 @@ void URageSettingsSubsystem::ResetAllCategoriesToDefault(bool bApplyImmediately)
 	if (bApplyImmediately)
 	{
 		DeferredEvaluateRestartRequirement();
+		EndApplyWhenSettled();
 	}
 }
 
@@ -242,6 +258,72 @@ void URageSettingsSubsystem::DeferredEvaluateRestartRequirement()
 			RestartRequirementEvaluatedDelegate.Broadcast(IsRestartRequired());
 			return false;
 		}));
+}
+
+void URageSettingsSubsystem::BeginApply()
+{
+	if (bApplyInProgress)
+	{
+		return;
+	}
+
+	bApplyInProgress = true;
+	ApplyStartedDelegate.Broadcast();
+}
+
+void URageSettingsSubsystem::EndApplyWhenSettled()
+{
+	if (!bApplyInProgress)
+	{
+		return;
+	}
+
+	ApplyHoldRemaining = FMath::Max(0.f, SETTINGS->ApplyFinishedAdditionalHoldSeconds);
+
+	if (ApplyHoldRemaining <= 0.f && !IsAnyCategoryApplying())
+	{
+		FinishApply();
+		return;
+	}
+
+	FTSTicker::RemoveTicker(ApplySettledTickerHandle);
+	ApplySettledTickerHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this,
+		[this](float DeltaTime) -> bool
+		{
+			if (IsAnyCategoryApplying())
+			{
+				return true;
+			}
+
+			ApplyHoldRemaining -= DeltaTime;
+			if (ApplyHoldRemaining > 0.f)
+			{
+				return true;
+			}
+
+			FinishApply();
+			return false;
+		}));
+}
+
+void URageSettingsSubsystem::FinishApply()
+{
+	ApplyHoldRemaining = 0.f;
+	bApplyInProgress = false;
+	ApplyFinishedDelegate.Broadcast();
+}
+
+bool URageSettingsSubsystem::IsAnyCategoryApplying() const
+{
+	for (const TScriptInterface<IRageSettingsCategoryInterface>& Category : AllCategories)
+	{
+		if (Category && Category->IsApplyInProgress())
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 bool URageSettingsSubsystem::RestartGame()

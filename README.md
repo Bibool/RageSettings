@@ -207,7 +207,7 @@ bool bShowDamageNumbers = true;
 |---|---|---|
 | `bool` | Toggle | `DefaultToggleRowClass` |
 | `float` / `double` / `int32` / `int64` / plain `uint8` | Slider | `DefaultSliderRowClass` |
-| `enum class` / `TEnumAsByte` | Selection | `DefaultSelectionRowClass` |
+| `enum class` / `TEnumAsByte` | Selection, or Combo | `DefaultSelectionRowClass` / `DefaultComboRowClass` |
 | anything else (structs, arrays, `FString`, object refs) | — skipped | — |
 
 Two rules follow from this:
@@ -219,6 +219,37 @@ Two rules follow from this:
 Per-row overrides come from `GetRowDescriptors()` (label, clamp range, slider format) and from
 `RowWidgetClassOverrides` in **Rage - Settings UI** (a per-property-name widget class override; a
 class that doesn't derive from the expected row base is ignored with a warning).
+
+Which of the two an enum becomes is decided by that override: point a property at a Blueprint
+deriving `URageComboRow` and it gets a combo, at one deriving `URageSelectionRow` and it gets a
+selection row. A property with no override follows `bEnumSettingsUsesComboRow`, which is the project
+wide default and ships as Selection.
+
+### Localizing generated rows
+
+A generated row asks, in order, for its label:
+
+1. `GetRowDescriptors()`, for a panel that already has an `FText` for the field.
+2. `DesiredLabel` on the row's `RowWidgetClassOverrides` entry.
+3. The string tables, keyed by the property name (`Culture`).
+4. A display string derived from the property name (`bShowDamageNumbers` → "Show Damage Numbers").
+
+and for each option of an enum-backed row:
+
+1. `OptionLabels` on the row's `RowWidgetClassOverrides` entry, keyed by the enum entry name
+   (`French`, not `ERageCultures::French`).
+2. The string tables, keyed by the entry name scoped to its enum (`ERageCultures_French`), then by
+   the bare entry name (`French`), which is the key the hand-authored panels already use.
+3. A display string derived from the entry name.
+
+The tables searched are the one this plugin ships and then whichever the project lists in
+`AdditionalStringTables` under **Rage - Settings UI**, so a project translates the fields and enums
+it adds by subclassing without touching an asset inside the plugin. A `UPROPERTY`'s `DisplayName`
+metadata is deliberately not consulted: it is stripped from cooked builds, so a field relying on it
+would read differently in the editor and in the shipped game.
+
+Combo rows keep the text they were given rather than only the strings shown in the box, so a row
+built while the game was in one language rebuilds itself when the player picks another.
 
 ### Toggle (bool)
 
@@ -316,10 +347,10 @@ row Blueprint. Pip styles: `Cumulative` fills every pip up to the selection (qua
 
 ### Combo (drop-down)
 
-`URageComboRow` wraps a `UComboBoxString`. **The row generator never produces one** — enums always
-become Selection rows — so combos are for hand-authored rows whose options come from runtime data
-rather than from a `UPROPERTY`. The resolution row is the canonical case: its options are whatever
-`GetSupportedResolutions()` reports on this machine.
+`URageComboRow` wraps a `UComboBoxString`. The generator produces one for any enum property whose
+override names a combo Blueprint, and hand-authored panels use it for rows whose options come from
+runtime data rather than from a `UPROPERTY`. The resolution row is the canonical case of the second:
+its options are whatever `GetSupportedResolutions()` reports on this machine.
 
 ```cpp
 ResolutionRow->SetLabel(RAGE_LOC("Resolution"));
@@ -328,8 +359,9 @@ ResolutionRow->ValueChangedDelegate.AddUObject(this, &UMyPanel::HandleResolution
 ResolutionRow->SetSelectedIndex(Index);            // bNotify defaults to false
 ```
 
-You can still get a combo for a generated row: point that property at a `URageComboRow` Blueprint via
-`RowWidgetClassOverrides` in **Rage - Settings UI**.
+`SetOptions()` takes strings and is for options that were never text to begin with, such as a
+resolution or a monitor name. `SetOptionTexts()` takes `FText`, which is what a generated row hands
+over, and is what lets the row rebuild its list in the player's new language.
 
 **Widget contract** — Blueprint deriving `URageComboRow`:
 
@@ -578,16 +610,22 @@ that can directly manipulate the widget generated for the property, if set, it i
 
 ## Where things are saved
 
-| Category | Config file |
-|---|---|
-| Video | `GameUserSettings.ini` (standard `UGameUserSettings` location) |
-| Game | `RageGameSettings.ini` |
-| Audio | `RageAudioSettings.ini` |
-| Input (sensitivity, inversion) | `RageInputSettings.ini` |
-| Keybinds | Enhanced Input's own user settings, saved on every remap |
+| Category | Config file | Section |
+|---|---|---|
+| Video | `GameUserSettings.ini` | `[/Script/RageSettings.RageVideoSettings]` |
+| Game | `GameUserSettings.ini` | `[/Script/RageSettings.RageGameSettings]` |
+| Audio | `GameUserSettings.ini` | `[/Script/RageSettings.RageAudioSettings]` |
+| Input (sensitivity, inversion) | `GameUserSettings.ini` | `[/Script/RageSettings.RageInputSettings]` |
+| Keybinds | Enhanced Input's own user settings, saved on every remap | |
 
-All under `Saved/Config/<Platform>/` at runtime; project defaults go in
-`Config/Default<Name>.ini` as usual.
+All four categories share `GameUserSettings.ini` under `Saved/Config/<Platform>/`, one section each,
+and a subclass writes under its own class name. Project defaults go in `Config/DefaultGameUserSettings.ini`.
+
+**Do not move a category to a config file of its own.** `UCLASS(Config = MyOwnName)` looks like it
+works: the category applies, `SaveConfig()` reports success, and the values survive as long as the
+process lives, because they are copied into the class default object. Nothing reaches disk. A config
+name the engine does not already know has no branch behind it to write into, so every save is dropped
+in silence and the category reads its defaults again on the next launch.
 
 ---
 
@@ -599,9 +637,9 @@ All under `Saved/Config/<Platform>/` at runtime; project defaults go in
   button and dirty markers never account for them.
 - **The row generator handles bool / numeric / enum only.** Structs, arrays, strings and object
   references are skipped — hand-author those rows.
-- **The generator never emits a combo row.** Enums become Selection rows unless you override the
-  widget class per property. If you absolutely prefer combo rows for such values, you can go to the UI Settings and simply use `bEnumSettingsUsesComboRow`
-. The advantage of SelectionRows is that they use native FText and Combo uses FString parsed from FText.
+- **A generated row is only as translated as its string table.** Labels and enum options resolve
+  through the tables listed in **Rage - Settings UI**; a key nobody has written falls back to a
+  display string derived from the C++ name, which is English by construction.
 - **The subsystem hard-fails as a unit.** If the `GameUserSettings` class isn't
   `URageVideoSettings`, no category initializes. Check the log for
   `URageSettingsSubsystem::Initialize` on startup — it says exactly this.

@@ -58,6 +58,13 @@ public:
 	
 	UPROPERTY(Config, BlueprintReadOnly, Category = "Rage|Video")
 	float FpsMax = 240.f;
+
+	/** Extra seconds to keep the applying state up after the work has actually finished, so a fast apply
+	 *  still reads as something having happened rather than a one-frame flash. Added on top of however
+	 *  long the apply took, not a minimum duration. Zero fires the finished event as soon as the last
+	 *  category settles. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Rage|Settings", meta = (ClampMin = "0.0", UIMax = "3.0", ForceUnits = "s"))
+	float ApplyFinishedAdditionalHoldSeconds = 0.f;
 	
 	UPROPERTY(Config, BlueprintReadOnly, Category = "Rage|Input")
 	float SensitivityMin = 0.1f;
