@@ -31,8 +31,10 @@ public class RageSettings : ModuleRules
 			"RHI",
 			"RenderCore",
 			"ApplicationCore",
+			"Slate",
 			"SlateCore",
-			"RageSettingsShared"
+			"RageSettingsShared",
+			"ApplicationCore"
 		});
 		
 		if (Target.Platform == UnrealTargetPlatform.Win64)
