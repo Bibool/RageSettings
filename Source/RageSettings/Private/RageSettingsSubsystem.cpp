@@ -8,6 +8,7 @@
 #include "RageGameSettings.h"
 #include "RageInputSettings.h"
 #include "RageSettingsDeveloperSettings.h"
+#include "RageSettingsReflectionUtils.h"
 #include "Engine/Engine.h"
 #include "HAL/PlatformProcess.h"
 #include "Misc/CommandLine.h"
@@ -60,6 +61,7 @@ void URageSettingsSubsystem::Deinitialize()
 {
 	FTSTicker::RemoveTicker(RestartCheckTickerHandle);
 	FTSTicker::RemoveTicker(ApplySettledTickerHandle);
+	FTSTicker::RemoveTicker(ChangeBroadcastTickerHandle);
 
 	VideoSettings->DirtyStateChangedDelegate.RemoveAll(this);
 	AudioSettings->DirtyStateChangedDelegate.RemoveAll(this);
@@ -119,9 +121,7 @@ void URageSettingsSubsystem::ApplyAllDirtySettings()
 	{
 		if (Category && Category->IsDirty())
 		{
-			const ERageSettingsCategory Id = Category->GetCategoryId();
-			Category->ApplySettings();
-			CategoryAppliedDelegate.Broadcast(Id);
+			ApplyCategoryTrackingChanges(Category.GetInterface(), false);
 		}
 	}
 
@@ -148,10 +148,7 @@ void URageSettingsSubsystem::ApplyAndSaveAllDirtySettings()
 	{
 		if (Category && Category->IsDirty())
 		{
-			const ERageSettingsCategory Id = Category->GetCategoryId();
-			Category->ApplySettings();
-			Category->SaveSettings();
-			CategoryAppliedDelegate.Broadcast(Id);
+			ApplyCategoryTrackingChanges(Category.GetInterface(), true);
 		}
 	}
 
@@ -184,9 +181,7 @@ void URageSettingsSubsystem::ResetCategoryToDefault(ERageSettingsCategory Catego
 	{
 		BeginApply();
 
-		Target->ApplySettings();
-		Target->SaveSettings();
-		CategoryAppliedDelegate.Broadcast(Category);
+		ApplyCategoryTrackingChanges(Target, true);
 
 		DeferredEvaluateRestartRequirement();
 		EndApplyWhenSettled();
@@ -211,10 +206,7 @@ void URageSettingsSubsystem::ResetAllCategoriesToDefault(bool bApplyImmediately)
 
 		if (bApplyImmediately && Category->IsDirty())
 		{
-			const ERageSettingsCategory Id = Category->GetCategoryId();
-			Category->ApplySettings();
-			Category->SaveSettings();
-			CategoryAppliedDelegate.Broadcast(Id);
+			ApplyCategoryTrackingChanges(Category.GetInterface(), true);
 		}
 	}
 
@@ -324,6 +316,106 @@ bool URageSettingsSubsystem::IsAnyCategoryApplying() const
 	}
 
 	return false;
+}
+
+void URageSettingsSubsystem::ApplyCategoryTrackingChanges(IRageSettingsCategoryInterface* Category, bool bSaveAfterApply)
+{
+	/* Read before the apply. Afterwards Pending has been copied over the live object and the two
+	 * agree, so there is no longer anything to tell apart. */
+	TArray<FName> Changed = RageSettings::CollectChangedProperties(Category->_getUObject(), Category->GetPendingObject());
+
+	const ERageSettingsCategory Id = Category->GetCategoryId();
+
+	Category->ApplySettings();
+
+	if (bSaveAfterApply)
+	{
+		Category->SaveSettings();
+	}
+
+	CategoryAppliedDelegate.Broadcast(Id);
+
+	QueueChangeBroadcast(Id, MoveTemp(Changed));
+}
+
+void URageSettingsSubsystem::QueueChangeBroadcast(ERageSettingsCategory Category, TArray<FName>&& ChangedProperties)
+{
+	if (ChangedProperties.IsEmpty())
+	{
+		return;
+	}
+
+	PendingChangeBroadcasts.Add({Category, MoveTemp(ChangedProperties)});
+
+	/* A category that had nothing to defer is told about in this frame. Holding it until the
+	 * subsystem's own apply finishes would put every listener behind whichever category is slowest,
+	 * and behind ApplyFinishedAdditionalHoldSeconds, which is there to pace the UI and nothing more. */
+	FlushSettledChangeBroadcasts();
+
+	if (PendingChangeBroadcasts.IsEmpty() || ChangeBroadcastTickerHandle.IsValid())
+	{
+		return;
+	}
+
+	ChangeBroadcastTickerHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this,
+		[this](float) -> bool
+		{
+			FlushSettledChangeBroadcasts();
+
+			if (!PendingChangeBroadcasts.IsEmpty())
+			{
+				return true;
+			}
+
+			ChangeBroadcastTickerHandle.Reset();
+			return false;
+		}));
+}
+
+void URageSettingsSubsystem::FlushSettledChangeBroadcasts()
+{
+	/* A listener is free to apply something of its own, which lands back here partway through the
+	 * walk below. Letting that inner call run would have it removing entries this one has not
+	 * reached yet; whatever it queued is picked up before this loop ends anyway. */
+	if (bFlushingChangeBroadcasts)
+	{
+		return;
+	}
+
+	TGuardValue<bool> FlushGuard(bFlushingChangeBroadcasts, true);
+
+	for (int32 Index = 0; Index < PendingChangeBroadcasts.Num(); )
+	{
+		const IRageSettingsCategoryInterface* Target = ResolveCategory(PendingChangeBroadcasts[Index].Category);
+		if (Target && Target->IsApplyInProgress())
+		{
+			++Index;
+			continue;
+		}
+
+		/* Off the list before anyone is told, so a listener that applies something of its own does
+		 * not find this entry still waiting and broadcast it a second time. */
+		const FPendingChangeBroadcast Settled = MoveTemp(PendingChangeBroadcasts[Index]);
+		PendingChangeBroadcasts.RemoveAt(Index);
+
+		BroadcastCategoryChanges(Settled.Category, Settled.ChangedProperties);
+	}
+}
+
+void URageSettingsSubsystem::BroadcastCategoryChanges(ERageSettingsCategory Category, const TArray<FName>& ChangedProperties)
+{
+	IRageSettingsCategoryInterface* Target = ResolveCategory(Category);
+	if (!Target)
+	{
+		return;
+	}
+
+	Target->GetChangeRegistry().Broadcast(Category, ChangedProperties);
+
+	for (const FName& PropertyName : ChangedProperties)
+	{
+		SettingChangedDelegate.Broadcast(Category, PropertyName);
+	}
 }
 
 bool URageSettingsSubsystem::RestartGame()

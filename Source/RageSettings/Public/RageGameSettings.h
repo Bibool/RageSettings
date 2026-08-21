@@ -31,6 +31,8 @@ public:
 	virtual bool IsDirty() const override;
 	virtual void NotifyPendingChangedExternally(bool bWasDirtyBefore) override { BroadcastDirtyIfChanged(bWasDirtyBefore); }
 	virtual ERageSettingsCategory GetCategoryId() const override { return ERageSettingsCategory::Game; }
+	virtual const UObject* GetPendingObject() const override { return Pending; }
+	virtual FRageSettingChangeRegistry& GetChangeRegistry() override { return ChangeRegistry; }
 //~ End IRageSettingsCategory
 
 	UFUNCTION(BlueprintPure, Category = "Rage|Game")
@@ -48,6 +50,8 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<URageGameSettings> Defaults = nullptr;
+
+	FRageSettingChangeRegistry ChangeRegistry;
 
 private:
 	void BroadcastDirtyIfChanged(bool bWasDirtyBefore);

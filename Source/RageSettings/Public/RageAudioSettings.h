@@ -32,6 +32,8 @@ public:
 	virtual bool IsDirty() const override;
 	virtual void NotifyPendingChangedExternally(bool bWasDirtyBefore) override { BroadcastDirtyIfChanged(bWasDirtyBefore); }
 	virtual ERageSettingsCategory GetCategoryId() const override { return ERageSettingsCategory::Audio; }
+	virtual const UObject* GetPendingObject() const override { return Pending; }
+	virtual FRageSettingChangeRegistry& GetChangeRegistry() override { return ChangeRegistry; }
 //~ End IRageSettingsCategory
 
 	UFUNCTION(BlueprintCallable, Category = "Rage|Audio")
@@ -61,6 +63,8 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<URageAudioSettings> Defaults = nullptr;
+
+	FRageSettingChangeRegistry ChangeRegistry;
 
 private:
 	void BroadcastDirtyIfChanged(bool bWasDirtyBefore);
