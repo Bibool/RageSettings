@@ -105,6 +105,13 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Rage|Delegates")
 	FRageSettingsApplyFinished ApplyFinishedDelegate;
 
+	/** Fires once per property an apply actually changed, once that property's category has settled.
+	 *  Blueprint's way in: C++ listeners that care about a single setting should bind through the
+	 *  category instead, with IRageSettingsCategoryInterface::OnSettingChanged, and be spared waking
+	 *  for every other property in the game. */
+	UPROPERTY(BlueprintAssignable, Category = "Rage|Delegates")
+	FRageSettingChanged SettingChangedDelegate;
+
 private:
 	UFUNCTION()
 	void HandleCategoryDirtyStateChanged(ERageSettingsCategory Category, bool bIsDirty);
@@ -116,10 +123,32 @@ private:
 	void FinishApply();
 	bool IsAnyCategoryApplying() const;
 
+	/** Notes what the apply is about to change, applies it, and hands the list to
+	 *  QueueChangeBroadcast. Every path that applies a category goes through here, which is what
+	 *  keeps the per-property listeners from depending on which button the player pressed. */
+	void ApplyCategoryTrackingChanges(IRageSettingsCategoryInterface* Category, bool bSaveAfterApply);
+
+	void QueueChangeBroadcast(ERageSettingsCategory Category, TArray<FName>&& ChangedProperties);
+	void FlushSettledChangeBroadcasts();
+	void BroadcastCategoryChanges(ERageSettingsCategory Category, const TArray<FName>& ChangedProperties);
+
 	IRageSettingsCategoryInterface* ResolveCategory(ERageSettingsCategory Category) const;
+
+	/** A category's changed properties, waiting on that category alone. Held by id rather than by
+	 *  pointer because the wait can span ticks. */
+	struct FPendingChangeBroadcast
+	{
+		ERageSettingsCategory Category;
+		TArray<FName> ChangedProperties;
+	};
+
+	TArray<FPendingChangeBroadcast> PendingChangeBroadcasts;
+
+	bool bFlushingChangeBroadcasts = false;
 
 	FTSTicker::FDelegateHandle RestartCheckTickerHandle;
 	FTSTicker::FDelegateHandle ApplySettledTickerHandle;
+	FTSTicker::FDelegateHandle ChangeBroadcastTickerHandle;
 
 	bool bApplyInProgress = false;
 

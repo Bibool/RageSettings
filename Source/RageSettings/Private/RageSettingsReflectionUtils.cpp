@@ -8,11 +8,11 @@
 
 bool RageSettings::AreObjectsEqual(const UObject* A, const UObject* B)
 {
-	check(A && B && A->GetClass() == B->GetClass());
+	check(IsValid(A) && IsValid(B) && A->GetClass() == B->GetClass());
 
 	for (TFieldIterator<FProperty> It(A->GetClass()); It; ++It)
 	{
-		FProperty* Property = *It;
+		const FProperty* Property = *It;
 		if (!Property->HasAnyPropertyFlags(CPF_Config))
 		{
 			continue;
@@ -27,13 +27,39 @@ bool RageSettings::AreObjectsEqual(const UObject* A, const UObject* B)
 	return true;
 }
 
+TArray<FName> RageSettings::CollectChangedProperties(const UObject* A, const UObject* B)
+{
+	TArray<FName> Changed;
+
+	if (!IsValid(A) || !IsValid(B) || A->GetClass() != B->GetClass())
+	{
+		return Changed;
+	}
+
+	for (TFieldIterator<FProperty> It(A->GetClass()); It; ++It)
+	{
+		const FProperty* Property = *It;
+		if (!Property->HasAnyPropertyFlags(CPF_Config))
+		{
+			continue;
+		}
+
+		if (!Property->Identical(Property->ContainerPtrToValuePtr<void>(A), Property->ContainerPtrToValuePtr<void>(B), PPF_None))
+		{
+			Changed.Add(Property->GetFName());
+		}
+	}
+
+	return Changed;
+}
+
 void RageSettings::CopyObjectProperties(UObject* Dest, const UObject* Src)
 {
-	check(Dest && Src && Dest->GetClass() == Src->GetClass());
+	check(IsValid(Dest) && IsValid(Src) && Dest->GetClass() == Src->GetClass());
 
 	for (TFieldIterator<FProperty> It(Dest->GetClass()); It; ++It)
 	{
-		FProperty* Property = *It;
+		const FProperty* Property = *It;
 		if (!Property->HasAnyPropertyFlags(CPF_Config))
 		{
 			continue;

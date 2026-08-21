@@ -28,6 +28,7 @@ Built and tested against **Unreal Engine 5.7**. MIT licensed — see [LICENSE](L
 - [Adding your own settings](#adding-your-own-settings)
 - [Building the UI](#building-the-ui)
 - [Runtime API](#runtime-api)
+  - [Reacting to a setting changing](#reacting-to-a-setting-changing)
 - [Localization](#localization)
 - [Where things are saved](#where-things-are-saved)
 - [Limitations](#limitations)
@@ -577,6 +578,7 @@ URageSettingsSubsystem* Settings = URageSettingsSubsystem::Get(WorldContextObjec
 | `HasAnyDirtySettings()` / `IsCategoryDirty(Category)` | |
 | `AnyCategoryDirtyStateChangedDelegate` | `(ERageSettingsCategory, bool)` — fires on *transitions*, not on every edit. |
 | `CategoryAppliedDelegate` | `(ERageSettingsCategory)` — good hook for reacting to applied settings from gameplay. |
+| `SettingChangedDelegate` | `(ERageSettingsCategory, FName)` — fires once per property an apply actually changed. Blueprint's way in; C++ should bind per property instead, see below. |
 
 Individual categories also expose their own `DirtyStateChangedDelegate` and typed `SetPendingX()`
 functions (`SetPendingMasterVolume`, `SetPendingFieldOfView`, `SetPendingUpscalerSettings`, …) for
@@ -584,7 +586,54 @@ code paths that don't go through a row widget. If you write to a Pending field d
 reflection, call `NotifyPendingChangedExternally(bWasDirtyBefore)` afterwards with the dirty state
 captured *before* the write, or the dirty broadcast is missed.
 
+### Reacting to a setting changing
+
+Gameplay code that cares about one setting rather than about the settings menu binds to that
+property by name, on the category that owns it:
+
+```cpp
+void ARagePlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (URageSettingsSubsystem* Settings = URageSettingsSubsystem::Get(this))
+	{
+		Settings->GetInputSettings()
+			->OnSettingChanged(GET_MEMBER_NAME_CHECKED(URageInputSettings, bInvertMouseY))
+			.AddUObject(this, &ARagePlayerController::HandleInvertYChanged);
+	}
+}
+
+void ARagePlayerController::HandleInvertYChanged(ERageSettingsCategory Category, FName PropertyName)
+{
+	/* The live value has already changed, so read it the ordinary way. */
+}
+```
+
+`OnAnySettingChanged()` is the same thing without the filter, called once per property of that
+category that changed. Both are plain multicast delegates: they hold weak references, so an actor
+being destroyed does not leave a dangling listener, and `Remove(Handle)` unbinds early if you need it.
+
+Reach for `GET_MEMBER_NAME_CHECKED` over a string literal. A literal binds to nothing, silently, the
+day someone renames the field.
+
+Three things worth knowing:
+
+- **It fires on apply, not on edit.** The player dragging a slider is staging a change they may still
+  cancel; `DirtyStateChangedDelegate` is what covers that. These listeners see `Current` changing,
+  which is the value gameplay reads.
+- **It waits for the category to settle, and for nothing else.** Some video work finishes a few ticks
+  after the apply, and listeners wait that out. They do not wait on `ApplyFinishedAdditionalHoldSeconds`,
+  which paces the UI, nor on a slower category applying alongside this one.
+- **Keybinds are not covered.** They belong to Enhanced Input rather than to a `Config` property on
+  the category, so a remap is invisible to this. Use `URageKeybindRow::KeyRemappedDelegate`.
+
+Which properties are watchable follows the same rule as the row generator: every `UPROPERTY(Config)`
+on the category, including the ones a project adds by subclassing.
+
 ---
+
+.---
 
 ## Localization
 

@@ -3,12 +3,14 @@
 
 #pragma once
 
+#include "RageSettingChangeRegistry.h"
 #include "RageSettingsCategory.h"
 #include "UObject/Interface.h"
 #include "RageSettingsCategoryInterface.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FRageCategoryDirtyStateChanged, ERageSettingsCategory, Category, bool, bDirty);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FRageCategoryApplied, ERageSettingsCategory, Category);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FRageSettingChanged, ERageSettingsCategory, Category, FName, PropertyName);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FRageSettingsApplyStarted);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FRageSettingsApplyFinished);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FRageRestartRequirementEvaluated, bool, bRestartRequired);
@@ -57,4 +59,24 @@ public:
 	/** True while ApplySettings has work still outstanding on a later tick. Categories that apply
 	 *  everything synchronously need not override this. */
 	virtual bool IsApplyInProgress() const { return false; }
+
+	/** The shadow the category stages edits into, which the subsystem diffs against the live object
+	 * to work out what an apply is about to change. */
+	virtual const UObject* GetPendingObject() const = 0;
+
+	/** Where this category's per-property listeners live. Prefer OnSettingChanged below, which is
+	 * the same thing without the reader having to know a registry exists. */
+	virtual FRageSettingChangeRegistry& GetChangeRegistry() = 0;
+
+	/** Listeners for one property of this category, fired once its apply has settled:
+	 *
+	 *   Settings->OnSettingChanged(GET_MEMBER_NAME_CHECKED(URageInputSettings, bInvertMouseY))
+	 *       .AddUObject(this, &ARagePlayerController::HandleInvertYChanged);
+	 *
+	 * This is the live value changing, not the player staging an edit they may still cancel, so a
+	 * handler can read the setting through its ordinary getter and act on it. */
+	FRageSettingChangedNative& OnSettingChanged(FName PropertyName) { return GetChangeRegistry().OnPropertyChanged(PropertyName); }
+
+	/** As above, called once for each property of this category that changed. */
+	FRageSettingChangedNative& OnAnySettingChanged() { return GetChangeRegistry().OnAnyPropertyChanged(); }
 };

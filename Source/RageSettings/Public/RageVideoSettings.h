@@ -51,6 +51,8 @@ public:
 	virtual void NotifyPendingChangedExternally(bool bWasDirtyBefore) override { BroadcastDirtyIfChanged(bWasDirtyBefore); }
 	virtual ERageSettingsCategory GetCategoryId() const override { return ERageSettingsCategory::Video; }
 	virtual bool IsApplyInProgress() const override;
+	virtual const UObject* GetPendingObject() const override { return Pending; }
+	virtual FRageSettingChangeRegistry& GetChangeRegistry() override { return ChangeRegistry; }
 //~ End IRageSettingsCategory
 
 #pragma region SETTERS
@@ -319,6 +321,8 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<URageVideoSettings> Defaults = nullptr;
+
+	FRageSettingChangeRegistry ChangeRegistry;
 
 private:
 	void PushCurrentIntoEngineProperties();
