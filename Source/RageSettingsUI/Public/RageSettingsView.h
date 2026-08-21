@@ -129,12 +129,12 @@ protected:
 	
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<URageConfirmModal> RestartRequiredModal = nullptr;
-	
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional)) 
-	TObjectPtr<UUserWidget> ApplyInProgressView = nullptr;
-	
+		
 	UPROPERTY(EditDefaultsOnly)
 	ERageSettingsCategory DefaultCategory = ERageSettingsCategory::Video;
+	
+	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<UUserWidget> ApplyInProgressViewClass = nullptr;
 
 private:
 	void InitializeView();
@@ -207,4 +207,7 @@ private:
 	ERageSettingsCategory ActiveCategory = ERageSettingsCategory::Video;
 
 	bool bCloseViewAfterRestartPrompt = false;
+	
+	UPROPERTY(Transient) 
+	TObjectPtr<UUserWidget> ApplyInProgressView = nullptr;
 };

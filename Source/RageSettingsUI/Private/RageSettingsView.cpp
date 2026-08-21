@@ -303,6 +303,12 @@ void URageSettingsView::HandleRestartDeclined()
 
 void URageSettingsView::HandleApplyStarted()
 {
+	if (!IsValid(ApplyInProgressView))
+	{
+		ApplyInProgressView = CreateWidget<UUserWidget>(GetWorld(), ApplyInProgressViewClass);
+		ApplyInProgressView->AddToViewport();
+	}
+	
 	if (IsValid(ApplyInProgressView))
 	{
 		ApplyInProgressView->SetVisibility(ESlateVisibility::HitTestInvisible);
