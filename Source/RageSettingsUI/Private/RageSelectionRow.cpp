@@ -61,6 +61,7 @@ void URageSelectionRow::NativeConstruct()
 
 	Left_Button->OnClicked.AddUniqueDynamic(this, &URageSelectionRow::HandleLeftClicked);
 	Right_Button->OnClicked.AddUniqueDynamic(this, &URageSelectionRow::HandleRightClicked);
+	PipView->PipClickedDelegate.AddUniqueDynamic(this, &URageSelectionRow::HandlePipClicked);
 
 	RefreshSelection();
 }
@@ -87,6 +88,11 @@ void URageSelectionRow::HandleLeftClicked()
 void URageSelectionRow::HandleRightClicked()
 {
 	CycleSelection(1);
+}
+
+void URageSelectionRow::HandlePipClicked(int32 PipIndex)
+{
+	SetSelectedIndex(PipIndex, /*bNotify*/ true);
 }
 
 void URageSelectionRow::CycleSelection(int8 Direction)

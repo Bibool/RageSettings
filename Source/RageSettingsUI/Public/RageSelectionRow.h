@@ -51,6 +51,9 @@ private:
 
 	UFUNCTION()
 	void HandleRightClicked();
+	
+	UFUNCTION()
+	void HandlePipClicked(int32 PipIndex);
 
 	void CycleSelection(int8 Direction);
 
