@@ -39,8 +39,14 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Rage|UI")
 	ERagePipState ResolvePipState(int32 PipIndex) const;
+	
+	UPROPERTY(Blueprintable, BlueprintCallable, BlueprintAssignable)
+	FRagePipClicked PipClickedDelegate;
 
 protected:
+	UFUNCTION()
+	void HandlePipClicked(int32 PipIndex);
+	
 	UPROPERTY(EditDefaultsOnly, NoClear, Category = "Rage|UI")
 	TSubclassOf<URagePipElement> PipElementClass = nullptr;
 

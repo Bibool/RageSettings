@@ -34,6 +34,7 @@ void URagePipView::SetPipCount(int32 NewPipCount)
 		Pip->Setup(Index);
 		Pip->OnSlotAssigned(PipContainer->AddChild(Pip));
 		Pips.Add(Pip);
+		Pip->PipClickedDelegate.AddDynamic(this, &URagePipView::HandlePipClicked);
 	}
 
 	while (Pips.Num() > TargetCount)
@@ -93,6 +94,11 @@ ERagePipState URagePipView::ResolvePipState(int32 PipIndex) const
 	}
 
 	return PipStyle == ERagePipStyle::Cumulative && PipIndex < SelectedIndex ? ERagePipState::Filled : ERagePipState::Empty;
+}
+
+void URagePipView::HandlePipClicked(int32 PipIndex)
+{
+	PipClickedDelegate.Broadcast(PipIndex);
 }
 
 void URagePipView::RefreshPipStates() const

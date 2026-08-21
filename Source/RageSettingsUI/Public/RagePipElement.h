@@ -6,6 +6,8 @@
 #include "Blueprint/UserWidget.h"
 #include "RagePipElement.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FRagePipClicked, int32, PipIndex);
+
 /* How one pip reads under the strip's current selection. Current implies filled in both pip
  * styles - it is called out separately so a Blueprint can mark the selected pip differently from
  * the ones merely behind it. */
@@ -48,6 +50,9 @@ public:
 	
 	UFUNCTION(BlueprintImplementableEvent, Category = "Rage|UI")
 	void OnSlotAssigned(UPanelSlot* BaseSlot);
+	
+	UPROPERTY(Blueprintable, BlueprintCallable, BlueprintAssignable)
+	FRagePipClicked PipClickedDelegate;
 
 protected:
 	virtual void NativeConstruct() override;
