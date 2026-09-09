@@ -444,6 +444,34 @@ Interactions worth knowing before you drop rows:
   `IsDLSSRRSupported()`.
 - **Frame generation** (DLSS-G and XeFG) is applied one tick late, deliberately — applying it in the
   same frame as a resolution change crashes.
+- **Frame generation vendor changes need a restart.** FSR, Streamline and XeFG each register an
+  `IDXGISwapchainProvider`; `FD3D12Viewport` takes the first one that claims D3D12 when the game
+  window is created and ignores the rest, so ownership is settled before the settings menu exists.
+  The two vendors that lost fail silently — their cvars still accept writes and their support queries
+  still say yes, they just never interpolate a frame. `ApplySettings` therefore records the chosen
+  vendor in `[RageFrameGeneration] Provider` in `GameUserSettings.ini` (upscaling being off writes
+  nothing, so the last real vendor stays reserved), and `RageSettingsShared`
+  (loaded at `PostConfigInit`, before the vendor RHI modules register) suppresses the other two.
+  NVIDIA and Intel both ship a switch for this, so those are used as intended:
+  `-slnoswapchainprovider` for Streamline (chosen over `r.Streamline.InitializePlugin` because Reflex
+  needs no provider and keeps working), and `r.XeFG.OverrideSwapChain` for XeFG. AMD ships nothing
+  equivalent, so FSR is handled from our side instead: a subscriber on
+  `IModularFeatures::OnModularFeatureRegistered` unregisters FSR's provider the moment it registers.
+  Its wrapper object stays alive and owned by the FSR module and is simply never asked for a swap
+  chain, which is where a vendor switch would have left it. **No vendor plugin is modified**, so an
+  FSR upgrade carries no local patch to re-apply. FSR upscaling uses a different path and is
+  unaffected either way.
+
+  `IsRestartRequiredForFrameGeneration()` compares the vendor the pending settings need against the
+  one that actually owns the swap chain, so the restart modal only appears when frame generation is
+  genuinely being asked for and cannot be delivered this session. Turning frame generation on or off,
+  or changing the multiplier, within the vendor that already owns the swap chain applies live.
+
+  Frame generation is never switched on for a vendor that does not own present. That is not a tidiness
+  rule: driving a vendor's plugin through a present path it did not create has crashed the process.
+  Applying it is also held back at startup by `StartupFrameGenerationDelaySeconds` in
+  **Rage - Settings**, since shader precompilation and async loading are still finishing then and the
+  vendor runtimes take tens of seconds to begin interpolating regardless.
 - **HDR.** `IsHDRSupported()` reports the OS/monitor state at process start; UE cannot turn HDR on for
   the monitor, so a player who enables HDR in Windows must restart the game before the option becomes
   available. Only 1000 and 2000 nits are offered because that's what the engine maps.

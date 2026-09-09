@@ -23,14 +23,14 @@ public class RageSettings : ModuleRules
 			"InputCore",
 			"EnhancedInput",
 			"GameplayTags",
-			"DeveloperSettings"
+			"DeveloperSettings",
+			"RageSettingsShared"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
 			"RHI",
-			"RenderCore",
-			"RageSettingsShared"
+			"RenderCore"
 		});
 		
 		if (Target.Platform == UnrealTargetPlatform.Win64)

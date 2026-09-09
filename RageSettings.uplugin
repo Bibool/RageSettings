@@ -28,7 +28,7 @@
 		{
 			"Name": "RageSettingsShared",
 			"Type": "Runtime",
-			"LoadingPhase": "Default"
+			"LoadingPhase": "PostConfigInit"
 		}
 	],
 	"Plugins": [
