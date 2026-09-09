@@ -67,14 +67,15 @@ namespace RageVideoCVars
 	static const TCHAR* FSRQualityMode = TEXT("r.FidelityFX.FSR.QualityMode");
 	static const TCHAR* FSRSharpness = TEXT("r.FidelityFX.FSR.Sharpness");
 	static const TCHAR* FSRFrameInterpolation = TEXT("r.FidelityFX.FI.Enabled");
-	static const TCHAR* ReflexMode = TEXT("r.Reflex.Mode");
 	static const TCHAR* XeSSEnable = TEXT("r.XeSS.Enabled");
+	
+	constexpr EConsoleVariableFlags SettingsPriority = ECVF_SetByGameOverride;
 
 	static void SetInt(const TCHAR* Name, int32 Value)
 	{
 		if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(Name))
 		{
-			CVar->Set(Value, ECVF_SetByGameSetting);
+			CVar->Set(Value, SettingsPriority);
 		}
 		else
 		{
@@ -86,7 +87,7 @@ namespace RageVideoCVars
 	{
 		if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(Name))
 		{
-			CVar->Set(Value, ECVF_SetByGameSetting);
+			CVar->Set(Value, SettingsPriority);
 		}
 		else
 		{
@@ -219,6 +220,18 @@ namespace RageUpscalerMapping
 	}
 #endif
 
+#if WITH_STREAMLINE_REFLEX
+	static EStreamlineReflexMode ToVendorReflex(ERageReflexMode Mode)
+	{
+		switch (Mode)
+		{
+			case ERageReflexMode::Enabled:          return EStreamlineReflexMode::Enabled;
+			case ERageReflexMode::EnabledPlusBoost: return EStreamlineReflexMode::Boost;
+			default:                                return EStreamlineReflexMode::Off;
+		}
+	}
+#endif
+
 #if WITH_FSR
 	static int32 ToVendor(ERageFSRMode Mode)
 	{
@@ -324,6 +337,9 @@ void URageVideoSettings::ApplySettings()
 	ApplyPostProcessCVars();
 	ApplyAntiAliasingCVars();
 	ApplyPreferredRHI();
+	
+	RageFrameGeneration::WritePreference(ProviderForMethod(Upscaler.Method));
+
 	RageVideoCVars::SetFloat(RageVideoCVars::Gamma, Brightness);
 
 	const int32 DisplayNits = RageHDRDisplayNits::ToInt32(HDRDisplayNits);
@@ -360,9 +376,7 @@ bool URageVideoSettings::IsDirty() const
 
 bool URageVideoSettings::IsApplyInProgress() const
 {
-	return DisplayModeTickerHandle.IsValid()
-		|| DLSSFrameGenTickerHandle.IsValid()
-		|| XeSSFrameGenTickerHandle.IsValid();
+	return DisplayModeTickerHandle.IsValid() || FrameGenTickerHandle.IsValid();
 }
 
 void URageVideoSettings::SetPendingResolution(FIntPoint NewResolution)
@@ -972,11 +986,45 @@ bool URageVideoSettings::IsRestartRequiredForRHI() const
 
 bool URageVideoSettings::IsRestartRequiredForFrameGeneration() const
 {
+	const URageVideoSettings* Source = IsValid(Pending) ? Pending : this;
+	
+	if (!Source->WantsFrameGeneration())
+	{
+		return false;
+	}
+
+	if (RageFrameGeneration::GetSwapChainOwner() != ProviderForMethod(Source->Upscaler.Method))
+	{
+		return true;
+	}
+
 #if WITH_XEFG
 	return UXeFGBlueprintLibrary::IfRelaunchRequiredByXeFG();
 #else
 	return false;
 #endif
+}
+
+bool URageVideoSettings::WantsFrameGeneration() const
+{
+	switch (Upscaler.Method)
+	{
+		case ERageUpscalerMethod::DLSS: return Upscaler.DLSSFrameGenMode != ERageFrameGenerationMode::Off;
+		case ERageUpscalerMethod::FSR:  return Upscaler.bFSRFrameInterpolation;
+		case ERageUpscalerMethod::XeSS: return Upscaler.XeSSFrameGenMode != ERageFrameGenerationMode::Off;
+		default:                        return false;
+	}
+}
+
+RageFrameGeneration::EProvider URageVideoSettings::ProviderForMethod(ERageUpscalerMethod Method)
+{
+	switch (Method)
+	{
+		case ERageUpscalerMethod::DLSS: return RageFrameGeneration::EProvider::DLSS;
+		case ERageUpscalerMethod::FSR:  return RageFrameGeneration::EProvider::FSR;
+		case ERageUpscalerMethod::XeSS: return RageFrameGeneration::EProvider::XeSS;
+		default:                        return RageFrameGeneration::EProvider::None;
+	}
 }
 
 bool URageVideoSettings::IsRestartRequired() const
@@ -1016,12 +1064,12 @@ void URageVideoSettings::ApplyRayTracingCVars(const FRageRayTracingSettings& Set
 	RageVideoCVars::SetBool(RageVideoCVars::RayTracingTranslucency, bMasterEnabled && Settings.bTranslucency);
 }
 
-void URageVideoSettings::ApplyUpscalerSettings(const FRageUpscalerSettings& Settings)
+void URageVideoSettings::ApplyUpscalerSettings(const FRageUpscalerSettings& Settings, float FrameGenerationDelaySeconds)
 {
 	const bool bWantsDLSS = Settings.Method == ERageUpscalerMethod::DLSS;
 	const bool bWantsFSR = Settings.Method == ERageUpscalerMethod::FSR;
 	const bool bWantsXeSS = Settings.Method == ERageUpscalerMethod::XeSS;
-	
+
 	RageVideoCVars::SetBool(RageVideoCVars::FSREnabled, bWantsFSR);
 
 	if (bWantsFSR)
@@ -1030,8 +1078,12 @@ void URageVideoSettings::ApplyUpscalerSettings(const FRageUpscalerSettings& Sett
 		RageVideoCVars::SetFloat(RageVideoCVars::FSRSharpness, Settings.FSRSharpness);
 	}
 
-	RageVideoCVars::SetBool(RageVideoCVars::FSRFrameInterpolation, bWantsFSR && Settings.bFSRFrameInterpolation);
-	RageVideoCVars::SetInt(RageVideoCVars::ReflexMode, StaticCast<int32>(Settings.ReflexMode));
+#if WITH_STREAMLINE_REFLEX
+	if (UStreamlineLibraryReflex::IsReflexSupported())
+	{
+		UStreamlineLibraryReflex::SetReflexMode(RageUpscalerMapping::ToVendorReflex(Settings.ReflexMode));
+	}
+#endif
 
 #if WITH_DLSS
 	/** DLSS claims r.ScreenPercentage itself. */
@@ -1050,23 +1102,13 @@ void URageVideoSettings::ApplyUpscalerSettings(const FRageUpscalerSettings& Sett
 	RageVideoCVars::SetBool(RageVideoCVars::DLSSEnable, false);
 #endif
 
-#if WITH_STREAMLINE_DLSSG
-	DeferredApplyDLSSFrameGeneration((bWantsDLSS && UStreamlineLibraryDLSSG::IsDLSSGSupported())
-		                                 ? Settings.DLSSFrameGenMode
-		                                 : ERageFrameGenerationMode::Off);
-#endif
-
 #if WITH_XESS
 	UXeSSBlueprintLibrary::SetXeSSQualityMode(bWantsXeSS ? RageUpscalerMapping::ToVendor(Settings.XeSSMode) : EXeSSQualityMode::Off);
 #else
 	RageVideoCVars::SetBool(RageVideoCVars::XeSSEnable, false);
 #endif
 
-#if WITH_XEFG
-	DeferredApplyXeSSFrameGeneration((bWantsXeSS && UXeFGBlueprintLibrary::IsXeFGSupported())
-		                                 ? Settings.XeSSFrameGenMode
-		                                 : ERageFrameGenerationMode::Off);
-#endif
+	DeferredApplyFrameGeneration(Settings, FrameGenerationDelaySeconds);
 
 #if WITH_XELL
 	if (UXeLLBlueprintLibrary::IsXeLLSupported() && UXeLLBlueprintLibrary::IsXeLLAvailable())
@@ -1125,7 +1167,7 @@ void URageVideoSettings::DeferredApplyStartupSettings()
 			Scalability::SetQualityLevels(ScalabilityQuality);
 
 			ApplyRayTracingCVars(RayTracing);
-			ApplyUpscalerSettings(Upscaler);
+			ApplyUpscalerSettings(Upscaler, SETTINGS->StartupFrameGenerationDelaySeconds);
 			ApplyPostProcessCVars();
 			ApplyAntiAliasingCVars();
 			RageVideoCVars::SetFloat(RageVideoCVars::Gamma, Brightness);
@@ -1331,30 +1373,41 @@ void URageVideoSettings::ClampUpscalerMethodToSupported(FRageUpscalerSettings& S
 	}
 }
 
-/* We defer applying FrameGeneration due to a crash that occurs when applied at the same time as resolution settings. */
-void URageVideoSettings::DeferredApplyDLSSFrameGeneration(ERageFrameGenerationMode DesiredMode)
+void URageVideoSettings::DeferredApplyFrameGeneration(const FRageUpscalerSettings& Settings, float DelaySeconds)
 {
-#if WITH_STREAMLINE_DLSSG
-	FTSTicker::RemoveTicker(DLSSFrameGenTickerHandle);
-	DLSSFrameGenTickerHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this,
-		[DesiredMode](float) -> bool
-		{
-			UStreamlineLibraryDLSSG::SetDLSSGMode(RageUpscalerMapping::ToVendorDLSSG(DesiredMode));
-			return false;
-		}));
-#endif
-}
+	FTSTicker::RemoveTicker(FrameGenTickerHandle);
 
-/* We defer applying FrameGeneration due to a crash that occurs when applied at the same time as resolution settings. */
-void URageVideoSettings::DeferredApplyXeSSFrameGeneration(ERageFrameGenerationMode DesiredMode)
-{
-#if WITH_XEFG
-	FTSTicker::RemoveTicker(XeSSFrameGenTickerHandle);
-	XeSSFrameGenTickerHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this,
-		[DesiredMode](float) -> bool
+	FrameGenTickerHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this,
+		[this, Settings](float) -> bool
 		{
-			UXeFGBlueprintLibrary::SetXeFGMode(RageUpscalerMapping::ToVendorXeFG(DesiredMode));
-			return false;
-		}));
+			const RageFrameGeneration::EProvider Wanted = ProviderForMethod(Settings.Method);
+			const RageFrameGeneration::EProvider Owner = RageFrameGeneration::GetSwapChainOwner();
+			const bool bOwnsPresent = Owner == Wanted;
+
+			if (!bOwnsPresent && WantsFrameGeneration())
+			{
+				S_LOG(Log, "Rage Settings: frame generation staying off. Swapchain owner = '{owner}', request = '{wanted}'. Restart needed for handover.",
+					RageFrameGeneration::ToString(Owner),
+					RageFrameGeneration::ToString(Wanted));
+			}
+
+			RageVideoCVars::SetBool(RageVideoCVars::FSRFrameInterpolation,
+				bOwnsPresent && Wanted == RageFrameGeneration::EProvider::FSR && Settings.bFSRFrameInterpolation);
+
+#if WITH_STREAMLINE_DLSSG
+			UStreamlineLibraryDLSSG::SetDLSSGMode(RageUpscalerMapping::ToVendorDLSSG(
+				(bOwnsPresent && Wanted == RageFrameGeneration::EProvider::DLSS && UStreamlineLibraryDLSSG::IsDLSSGSupported())
+					? Settings.DLSSFrameGenMode
+					: ERageFrameGenerationMode::Off));
 #endif
+
+#if WITH_XEFG
+			UXeFGBlueprintLibrary::SetXeFGMode(RageUpscalerMapping::ToVendorXeFG(
+				(bOwnsPresent && Wanted == RageFrameGeneration::EProvider::XeSS && UXeFGBlueprintLibrary::IsXeFGSupported())
+					? Settings.XeSSFrameGenMode
+					: ERageFrameGenerationMode::Off));
+#endif
+
+			return false;
+		}), DelaySeconds);
 }

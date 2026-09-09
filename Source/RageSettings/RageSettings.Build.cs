@@ -23,7 +23,8 @@ public class RageSettings : ModuleRules
 			"InputCore",
 			"EnhancedInput",
 			"GameplayTags",
-			"DeveloperSettings"
+			"DeveloperSettings",
+			"RageSettingsShared"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[]
@@ -33,7 +34,6 @@ public class RageSettings : ModuleRules
 			"ApplicationCore",
 			"Slate",
 			"SlateCore",
-			"RageSettingsShared",
 			"ApplicationCore"
 		});
 		

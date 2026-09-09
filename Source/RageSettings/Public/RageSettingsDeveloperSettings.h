@@ -65,6 +65,11 @@ public:
 	 *  category settles. */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Rage|Settings", meta = (ClampMin = "0.0", UIMax = "3.0", ForceUnits = "s"))
 	float ApplyFinishedAdditionalHoldSeconds = 0.f;
+
+	/** TODO: Make this event driven and state the requirement in README. Ideal flow should be;
+	 * Game start up, FG start up, then anything can follow, e.g. PSO precaching, main menu, intros etc. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Rage|Video", meta = (ClampMin = "0.0", UIMax = "30.0", ForceUnits = "s"))
+	float StartupFrameGenerationDelaySeconds = 5.f;
 	
 	UPROPERTY(Config, BlueprintReadOnly, Category = "Rage|Input")
 	float SensitivityMin = 0.1f;

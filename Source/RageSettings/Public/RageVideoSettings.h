@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "RageAntiAliasingMethod.h"
+#include "RageFrameGenerationProvider.h"
 #include "RageFeatureSupport.h"
 #include "RageHDRDisplayNits.h"
 #include "RageMonitorInfo.h"
@@ -229,6 +230,9 @@ public:
 	
 	UFUNCTION(BlueprintPure, Category = "Rage|Video")
 	bool IsRestartRequiredForFrameGeneration() const;
+
+	UFUNCTION(BlueprintPure, Category = "Rage|Video")
+	bool WantsFrameGeneration() const;
 	
 	UFUNCTION(BlueprintPure, Category = "Rage|Video")
 	bool IsRestartRequiredForMonitor() const;
@@ -349,7 +353,7 @@ protected:
 private:
 	void PushCurrentIntoEngineProperties();
 	void ApplyRayTracingCVars(const FRageRayTracingSettings& Settings);
-	void ApplyUpscalerSettings(const FRageUpscalerSettings& Settings);
+	void ApplyUpscalerSettings(const FRageUpscalerSettings& Settings, float FrameGenerationDelaySeconds = 0.f);
 	void ApplyPostProcessCVars();
 	void ApplyAntiAliasingCVars();
 	void ClampAntiAliasingMethodToSupported();
@@ -365,11 +369,11 @@ private:
 
 	void ClampUpscalerMethodToSupported(FRageUpscalerSettings& Settings) const;
 
-	void DeferredApplyDLSSFrameGeneration(ERageFrameGenerationMode DesiredMode);
-	void DeferredApplyXeSSFrameGeneration(ERageFrameGenerationMode DesiredMode);
+	static RageFrameGeneration::EProvider ProviderForMethod(ERageUpscalerMethod Method);
 
-	FTSTicker::FDelegateHandle DLSSFrameGenTickerHandle;
-	FTSTicker::FDelegateHandle XeSSFrameGenTickerHandle;
+	void DeferredApplyFrameGeneration(const FRageUpscalerSettings& Settings, float DelaySeconds);
+
+	FTSTicker::FDelegateHandle FrameGenTickerHandle;
 	FTSTicker::FDelegateHandle StartupApplyTickerHandle;
 	FTSTicker::FDelegateHandle DisplayModeTickerHandle;
 };

@@ -13,5 +13,10 @@ public class RageSettingsShared : ModuleRules
 		{
 			"Core"
 		});
+		
+		PrivateDependencyModuleNames.AddRange(new string[]
+		{
+			"RHI" // For IDXGISwapchainProvider
+		});
 	}
 }
