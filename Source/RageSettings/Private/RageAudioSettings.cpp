@@ -20,7 +20,7 @@
 void URageAudioSettings::LoadSettings()
 {
 	Pending = CastChecked<URageAudioSettings>(RageSettings::CreateShadowInstance(this, this));
-	Defaults = CastChecked<URageAudioSettings>(RageSettings::CreateShadowInstance(this, GetClass()->GetDefaultObject()));
+	Defaults = CastChecked<URageAudioSettings>(RageSettings::CreateDefaultsInstance(this, GetClass()));
 
 	FCoreDelegates::ApplicationWillDeactivateDelegate.AddUObject(this, &URageAudioSettings::HandleApplicationDeactivated);
 	FCoreDelegates::ApplicationHasReactivatedDelegate.AddUObject(this, &URageAudioSettings::HandleApplicationReactivated);

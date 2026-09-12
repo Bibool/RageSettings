@@ -15,6 +15,7 @@
 #include "Misc/Optional.h"
 #include "Containers/Ticker.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "UObject/UnrealType.h"
 #include "RageSettingsShared/Public/RageSettingsSharedDebug.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(RageVideoSettings)
@@ -314,7 +315,7 @@ void URageVideoSettings::LoadSettings()
 	ReconcilePreferredRHIWithActual();
 
 	Pending = CastChecked<URageVideoSettings>(RageSettings::CreateShadowInstance(this, this));
-	Defaults = CastChecked<URageVideoSettings>(RageSettings::CreateShadowInstance(this, GetClass()->GetDefaultObject()));
+	Defaults = CastChecked<URageVideoSettings>(RageSettings::CreateDefaultsInstance(this, GetClass()));
 
 	PushCurrentIntoEngineProperties();
 	DeferredApplyStartupSettings();
@@ -355,6 +356,15 @@ void URageVideoSettings::ResetToDefault()
 {
 	const bool bWasDirty = IsDirty();
 	RageSettings::CopyObjectProperties(Pending, Defaults);
+
+	/* UGameUserSettings' own fields keep their current values since it's also the engine's bookkeeping */
+	for (TFieldIterator<FProperty> It(UGameUserSettings::StaticClass()); It; ++It)
+	{
+		if (It->HasAnyPropertyFlags(CPF_Config))
+		{
+			It->CopyCompleteValue_InContainer(Pending, this);
+		}
+	}
 	BroadcastDirtyIfChanged(bWasDirty);
 }
 
