@@ -16,7 +16,10 @@ class USoundClass;
  * Player-profile audio settings. See RageGameSettings.h for the persistence/extension rationale
  * shared by every category - projects add their own fields by subclassing (see
  * RageSettingsDeveloperSettings::AudioSettingsClass).
- */
+ *
+ * A subclass that adds a volume of its own needs no code behind it. Name the sound class it drives in
+ * RageSettingsDeveloperSettings::VolumeSoundClasses, keyed by the property name, and the apply below
+ * reads the field by reflection. */
 UCLASS(Config = GameUserSettings)
 class RAGESETTINGS_API URageAudioSettings : public UObject, public IRageSettingsCategoryInterface
 {
@@ -71,9 +74,21 @@ private:
 	void HandleApplicationDeactivated();
 	void HandleApplicationReactivated();
 	void ApplyMuteState(bool bShouldMute);
-	void LoadMasterClassesAsync();
-	void HandleMasterClassesLoaded();
-	void ApplyMasterVolume();
+
+	void LoadSoundAssetsAsync();
+	void HandleSoundAssetsLoaded();
+	void ResolveVolumeSoundClasses();
+	bool EnsureSoundAssetsLoaded();
+
+	void ApplyVolumes();
+	void ApplyMasterVolume(FAudioDevice* AudioDevice);
+	void ApplyClassVolumes(FAudioDevice* AudioDevice);
+	void ApplyVolumeToClass(FAudioDevice* AudioDevice, USoundClass* SoundClass, float Volume) const;
+
+	void ActivateMasterSoundMix(FAudioDevice* AudioDevice);
+
+	const FProperty* FindVolumeProperty(FName PropertyName) const;
+	float GetVolumeForProperty(FName PropertyName) const;
 
 	FAudioDevice* ResolveAudioDevice() const;
 	
@@ -83,5 +98,10 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<USoundMix> LoadedMasterSoundMix = nullptr;
 
-	TSharedPtr<FStreamableHandle> MasterClassesLoadHandle;
+	UPROPERTY(Transient)
+	TMap<FName, TObjectPtr<USoundClass>> LoadedVolumeSoundClasses;
+
+	TSharedPtr<FStreamableHandle> SoundAssetsLoadHandle;
+
+	TOptional<uint32> MasterSoundMixDeviceId;
 };

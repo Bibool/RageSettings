@@ -20,6 +20,7 @@ class UWidgetSwitcher;
 class UButton;
 class UWidget;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FRageSettingsViewOpened);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FRageSettingsViewClosed);
 
 /**
@@ -68,8 +69,11 @@ public:
 	void OnButtonDisabled(UWidget* InButton, bool bNewState);
 
 	/** Fires once it is actually safe to remove this widget. This view excepts to have its visibility or parentship managed (collapsed/removed) */
-	UPROPERTY(BlueprintAssignable, Category = "Rage|Settings|View")
+	UPROPERTY(BlueprintCallable, BlueprintAssignable, Category = "Rage|Settings|View")
 	FRageSettingsViewClosed ViewClosedDelegate;
+	
+	UPROPERTY(BlueprintCallable, BlueprintAssignable, Category = "Rage|Settings|View")
+	FRageSettingsViewOpened ViewOpenedDelegate;
 
 protected:
 	virtual void NativeConstruct() override;

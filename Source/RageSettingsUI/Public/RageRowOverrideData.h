@@ -13,17 +13,17 @@ struct FRageRowOverrideData
 	GENERATED_BODY()
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<UUserWidget> WidgetClass;
+	bool bCreateWidget = true;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(EditCondition="bCreateWidget", EditConditionHides))
+	TSubclassOf<UUserWidget> WidgetClass = nullptr;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(EditCondition="bCreateWidget", EditConditionHides))
 	FText DesiredLabel = FText::GetEmpty();
-
-	/** What each option of an enum-backed row is called, keyed by the enum entry name ("French", not
-	 * "ERageCultures::French"). An entry left out here still resolves through the string tables, so
-	 * this is for the odd option that wants naming in place rather than for translating a whole enum. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(EditCondition="bCreateWidget", EditConditionHides))
 	TMap<FName, FText> OptionLabels;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Instanced)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Instanced, meta=(EditCondition="bCreateWidget", EditConditionHides))
 	TObjectPtr<URageRowOverrideObject> OverrideObject = nullptr;
 };

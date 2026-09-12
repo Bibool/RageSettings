@@ -474,6 +474,13 @@ Audio needs one piece of setup there too: `MasterSoundMix` and `MasterSoundClass
 `MasterVolume` is tracked and saved but never reaches the audio engine. (`bMuteWhenUnfocused` works
 without them — it drives the transient primary volume directly.)
 
+`VolumeSoundClasses` is how a volume beyond the master one is wired up: a map from the property name
+carrying the volume to the sound class it drives, so `"MusicVolume"` to your music class. A field
+listed there needs no code of its own — the audio category reads it by reflection on apply, and the
+Audio panel gives it a percent slider from the same entry. Put those classes under `MasterSoundClass`
+in the sound class tree; the engine multiplies a class by every override above it, so a category ends
+up at its own volume times the master.
+
 ---
 
 ## Adding your own settings

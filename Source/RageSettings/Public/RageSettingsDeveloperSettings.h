@@ -43,6 +43,11 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Rage|Audio")
 	TSoftObjectPtr<USoundClass> MasterSoundClass = nullptr;
+
+	/** The sound class each volume field drives, keyed by the property name that carries it on the
+	 * audio settings class, so "MusicVolume" for a MusicVolume field. Master has it's own property above. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Rage|Audio")
+	TMap<FName, TSoftObjectPtr<USoundClass>> VolumeSoundClasses;
 	
 	UPROPERTY(Config, BlueprintReadOnly, Category = "Rage|Video")
 	float FieldOfViewMin = 60.f;

@@ -18,6 +18,17 @@
 
 namespace
 {
+	bool ShouldCreateWidget(const FProperty* Property)
+	{
+		const URageSettingsUIDeveloperSettings* UISettings = URageSettingsUIDeveloperSettings::Get();
+		
+		if (const FRageRowOverrideData* Override = UISettings->RowWidgetClassOverrides.Find(Property->GetFName()))
+		{
+			return Override->bCreateWidget;
+		}
+		
+		return true;
+	}
 	UClass* ResolveRowWidgetClass(const FProperty* Property, const UClass* ExpectedBase, UClass* ProjectDefault)
 	{
 		const URageSettingsUIDeveloperSettings* UISettings = URageSettingsUIDeveloperSettings::Get();
@@ -67,6 +78,11 @@ void URageSettingsRowGeneratorPanelBase::BuildRows(UPanelWidget* Container, UObj
 
 	for (FProperty* Property : RageSettingsUI::CollectRowProperties(PendingObject->GetClass()))
 	{
+		if (!ShouldCreateWidget(Property))
+		{
+			continue;
+		}
+
 		const RageSettingsUI::ERowKind Kind = RageSettingsUI::ResolveRowKind(Property);
 		if (Kind == RageSettingsUI::ERowKind::Unsupported)
 		{
