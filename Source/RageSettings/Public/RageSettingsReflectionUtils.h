@@ -11,4 +11,5 @@ namespace RageSettings
 	RAGESETTINGS_API TArray<FName> CollectChangedProperties(const UObject* A, const UObject* B);
 	RAGESETTINGS_API void CopyObjectProperties(UObject* Dest, const UObject* Src);
 	RAGESETTINGS_API UObject* CreateShadowInstance(UObject* Outer, const UObject* Source, FName Name = NAME_None);
+	RAGESETTINGS_API UObject* CreateDefaultsInstance(UObject* Outer, UClass* Class);
 }

@@ -170,7 +170,7 @@ Every category implements `IRageSettingsCategoryInterface` and holds three insta
 ```
 Current   this            what is live and what gets written to disk
 Pending   GetPendingSettings()   what the UI edits
-Defaults  GetDefaultSettings()   the CDO snapshot, taken at load
+Defaults  GetDefaultSettings()   what the game ships with, built at load
 ```
 
 Only `UPROPERTY(Config)` fields participate — `RageSettings::AreObjectsEqual` /
@@ -178,7 +178,7 @@ Only `UPROPERTY(Config)` fields participate — `RageSettings::AreObjectsEqual` 
 revert and reset all pick up new fields automatically the moment you mark them `Config`.**
 
 ```
-LoadSettings()          Current from disk, Pending = Current, Defaults = CDO. Once, at startup.
+LoadSettings()          Current from disk, Pending = Current, Defaults from code + project config. Once, at startup.
    ... UI edits Pending ...
 IsDirty()               Pending != Current. Always derived, never a cached bool.
 ApplySettings()         Pending -> Current, then do the real engine-side work.
@@ -186,6 +186,23 @@ SaveSettings()          Persist Current.
 ResetToDefault()        Pending = Defaults. Does not apply or save on its own.
 RevertPendingChanges()  Pending = Current. The "Cancel" path.
 ```
+
+**Defaults are what the game ships with, never what the player saved.** They start from the C++
+initializers and take every config layer the engine reads for the category's file (the `Base`, `Default`
+and platform inis, plugin and hotfix layers, command-line overrides) except the player's own
+`Saved/Config/<Platform>/GameUserSettings.ini`. A value in `Config/DefaultGameUserSettings.ini` is
+therefore what Reset to Defaults goes back to. `RageSettings::CreateDefaultsInstance` builds them from
+the category's actual class, so a subclass's own `Config` fields get the same treatment with no extra
+work.
+
+They cannot be a snapshot of the class default object. The engine loads a config class's file into its
+CDO when the class registers, saved values included, so resetting to the CDO hands the player back their
+own last choices.
+
+Video resets every field it declares but leaves `UGameUserSettings`' own fields as they are. Those are
+the engine's bookkeeping, such as its save version and benchmark results, or settings the category
+either drives from its own fields or does not expose. Restoring a save version of zero would also make
+the engine reload the saved file over the reset as soon as it is applied.
 
 `URageSettingsSubsystem` owns all four, drives them together (`ApplyAllDirtySettings`,
 `RevertAllPendingChanges`, …) and re-broadcasts each category's dirty transitions through

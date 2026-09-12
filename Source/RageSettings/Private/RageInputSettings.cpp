@@ -23,7 +23,7 @@ void URageInputSettings::InitializeWithGameInstance(UGameInstance* InGameInstanc
 void URageInputSettings::LoadSettings()
 {
 	Pending = CastChecked<URageInputSettings>(RageSettings::CreateShadowInstance(this, this));
-	Defaults = CastChecked<URageInputSettings>(RageSettings::CreateShadowInstance(this, GetClass()->GetDefaultObject()));
+	Defaults = CastChecked<URageInputSettings>(RageSettings::CreateDefaultsInstance(this, GetClass()));
 }
 
 void URageInputSettings::ApplySettings()
