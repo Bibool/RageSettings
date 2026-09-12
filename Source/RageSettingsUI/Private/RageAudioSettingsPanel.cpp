@@ -4,10 +4,25 @@
 #include "RageAudioSettingsPanel.h"
 
 #include "RageAudioSettings.h"
-#include "RageMacros.h"
+#include "RageSettingsDeveloperSettings.h"
 #include "RageSettingsSubsystem.h"
+#include "RageSliderDisplayFormat.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(RageAudioSettingsPanel)
+
+namespace
+{
+	FRageSettingsRowDescriptor MakeVolumeDescriptor(FName PropertyName)
+	{
+		FRageSettingsRowDescriptor Descriptor;
+		Descriptor.PropertyName = PropertyName;
+		Descriptor.ClampMin = 0.f;
+		Descriptor.ClampMax = 1.f;
+		Descriptor.SliderFormat = ERageSliderDisplayFormat::Percent;
+
+		return Descriptor;
+	}
+}
 
 void URageAudioSettingsPanel::InitializePanel(URageSettingsSubsystem* InSubsystem)
 {
@@ -17,13 +32,13 @@ void URageAudioSettingsPanel::InitializePanel(URageSettingsSubsystem* InSubsyste
 
 TArray<FRageSettingsRowDescriptor> URageAudioSettingsPanel::GetRowDescriptors() const
 {
-	FRageSettingsRowDescriptor MasterVolume;
-	MasterVolume.PropertyName = GET_MEMBER_NAME_CHECKED(URageAudioSettings, MasterVolume);
-	MasterVolume.Label = RAGE_LOC("MasterVolume");
-	/* We don't get from DeveloperSettings Min/Max (nor are they present there) since it's a normalized field. */
-	MasterVolume.ClampMin = 0.f;
-	MasterVolume.ClampMax = 1.f;
-	MasterVolume.SliderFormat = ERageSliderDisplayFormat::Percent;
+	TArray<FRageSettingsRowDescriptor> Descriptors;
+	Descriptors.Add(MakeVolumeDescriptor(GET_MEMBER_NAME_CHECKED(URageAudioSettings, MasterVolume)));
+	
+	for (const TPair<FName, TSoftObjectPtr<USoundClass>>& Entry : SETTINGS->VolumeSoundClasses)
+	{
+		Descriptors.Add(MakeVolumeDescriptor(Entry.Key));
+	}
 
-	return { MasterVolume };
+	return Descriptors;
 }
