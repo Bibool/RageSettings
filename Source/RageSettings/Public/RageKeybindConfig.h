@@ -18,6 +18,9 @@ struct FRageKeybindConfig
 	FText DisplayName = FText::GetEmpty();
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rage|Input")
+	FText Description = FText::GetEmpty();
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rage|Input")
 	FGameplayTag Category = FGameplayTag::EmptyTag;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rage|Input")

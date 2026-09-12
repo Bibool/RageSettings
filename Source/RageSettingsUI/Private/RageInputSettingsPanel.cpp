@@ -174,6 +174,7 @@ URageKeybindRow* URageInputSettingsPanel::CreateKeybindRow(const FRageKeybindCon
 	}
 
 	Row->Setup(Config.MappingName, Config.DisplayName);
+	Row->ToolTipText = Config.Description;
 	Row->SetCurrentKey(InputSettings->GetCurrentKeyForMapping(Config.MappingName));
 	Row->KeyRemappedDelegate.AddDynamic(this, &URageInputSettingsPanel::HandleKeyRemapped);
 	Row->ResetToDefaultRequestedDelegate.AddDynamic(this, &URageInputSettingsPanel::HandleResetKeyToDefaultRequested);
