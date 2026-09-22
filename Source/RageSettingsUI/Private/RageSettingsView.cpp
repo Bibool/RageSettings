@@ -45,6 +45,12 @@ void URageSettingsView::RequestClose()
 {
 	if (Subsystem->HasAnyDirtySettings() && IsValid(UnsavedChangesModal))
 	{
+		if (UnsavedChangesModal->IsOpen())
+		{
+			HandleModalCancel();
+			return;
+		}
+		
 		UnsavedChangesModal->Open();
 		return;
 	}
