@@ -7,26 +7,52 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(RageUnsavedChangesModal)
 
-void URageUnsavedChangesModal::NativeConstruct()
-{
-	Super::NativeConstruct();
-
-	ApplyAndCloseButton->OnClicked.AddUniqueDynamic(this, &URageUnsavedChangesModal::HandleApplyAndCloseClicked);
-	DiscardAndCloseButton->OnClicked.AddUniqueDynamic(this, &URageUnsavedChangesModal::HandleDiscardAndCloseClicked);
-	CancelButton->OnClicked.AddUniqueDynamic(this, &URageUnsavedChangesModal::HandleCancelClicked);
-}
-
-void URageUnsavedChangesModal::HandleApplyAndCloseClicked()
+void URageUnsavedChangesModal::ChooseApplyAndClose()
 {
 	ApplyAndCloseChosenDelegate.Broadcast();
 }
 
-void URageUnsavedChangesModal::HandleDiscardAndCloseClicked()
+void URageUnsavedChangesModal::ChooseDiscardAndClose()
 {
 	DiscardAndCloseChosenDelegate.Broadcast();
 }
 
-void URageUnsavedChangesModal::HandleCancelClicked()
+void URageUnsavedChangesModal::ChooseCancel()
 {
 	CancelChosenDelegate.Broadcast();
+}
+
+void URageUnsavedChangesModal::NativeConstruct()
+{
+	Super::NativeConstruct();
+
+	if (IsValid(ApplyAndCloseButton))
+	{
+		ApplyAndCloseButton->OnClicked.AddUniqueDynamic(this, &URageUnsavedChangesModal::HandleApplyAndCloseClicked);
+	}
+
+	if (IsValid(DiscardAndCloseButton))
+	{
+		DiscardAndCloseButton->OnClicked.AddUniqueDynamic(this, &URageUnsavedChangesModal::HandleDiscardAndCloseClicked);
+	}
+
+	if (IsValid(CancelButton))
+	{
+		CancelButton->OnClicked.AddUniqueDynamic(this, &URageUnsavedChangesModal::HandleCancelClicked);
+	}
+}
+
+void URageUnsavedChangesModal::HandleApplyAndCloseClicked()
+{
+	ChooseApplyAndClose();
+}
+
+void URageUnsavedChangesModal::HandleDiscardAndCloseClicked()
+{
+	ChooseDiscardAndClose();
+}
+
+void URageUnsavedChangesModal::HandleCancelClicked()
+{
+	ChooseCancel();
 }

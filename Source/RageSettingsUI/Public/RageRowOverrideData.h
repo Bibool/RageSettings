@@ -21,6 +21,14 @@ struct FRageRowOverrideData
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(EditCondition="bCreateWidget", EditConditionHides))
 	FText DesiredLabel = FText::GetEmpty();
 	
+	/* The short line under the label. Without one, a string table entry keyed <Property>_Hint is used. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(EditCondition="bCreateWidget", EditConditionHides))
+	FText DesiredHint = FText::GetEmpty();
+
+	/* What a details pane says about the row. Without one, a string table entry keyed <Property>_Description is used. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(EditCondition="bCreateWidget", EditConditionHides, MultiLine="true"))
+	FText DesiredDescription = FText::GetEmpty();
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(EditCondition="bCreateWidget", EditConditionHides))
 	TMap<FName, FText> OptionLabels;
 

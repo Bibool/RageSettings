@@ -8,11 +8,13 @@
 
 class UComboBoxString;
 
+/** A pick-one-of-many row. The row owns the list and the selection, so a subclass can draw them with its
+ * own dropdown and leave ComboBox out of the tree entirely; the hooks below are where it would redraw. */
 UCLASS(Abstract, meta=(DisableNativeTick))
 class RAGESETTINGSUI_API URageComboRow : public URageRowBaseUserWidget
 {
 	GENERATED_BODY()
-	
+
 public:
 	UFUNCTION(BlueprintCallable, Category = "Rage|UI")
 	void SetOptions(const TArray<FString>& NewOptions);
@@ -29,11 +31,26 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Rage|UI")
 	int32 GetSelectedIndex() const;
 
+	UFUNCTION(BlueprintPure, Category = "Rage|UI")
+	int32 GetOptionCount() const;
+
+	UFUNCTION(BlueprintPure, Category = "Rage|UI")
+	FText GetOptionText(int32 Index) const;
+
 protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+	virtual FString GetValueKey() const override;
+	virtual FText GetValueText() const override;
+
+	/* The list was replaced or retranslated. The selection is already settled when this runs. */
+	virtual void NativeOnOptionsChanged();
+
+	/* The selection moved, by the player or by code. */
+	virtual void NativeOnSelectionChanged();
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UComboBoxString> ComboBox = nullptr;
 
 private:
@@ -42,14 +59,18 @@ private:
 
 	void HandleCultureChanged();
 
-	void RefreshOptionStrings();
+	void ApplyOptions(const TArray<FText>& NewOptions);
 
-	void ApplyOptionStrings(const TArray<FString>& NewOptions);
+	void SyncComboBoxOptions();
 
 	bool bSuppressNotify = false;
 
-	/* Empty for a row whose options came in as plain strings, which is a row with nothing to retranslate. */
-	TArray<FText> OptionTexts;
+	TArray<FText> Options;
+
+	/* False for a row whose options came in as plain strings, which is a row with nothing to retranslate. */
+	bool bOptionsAreText = false;
+
+	int32 SelectedIndex = INDEX_NONE;
 
 	FDelegateHandle CultureChangedHandle;
 };

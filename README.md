@@ -243,6 +243,22 @@ deriving `URageComboRow` and it gets a combo, at one deriving `URageSelectionRow
 selection row. A property with no override follows `bEnumSettingsUsesComboRow`, which is the project
 wide default and ships as Selection.
 
+A generated panel can also carry row classes of its own, so two panels for the same category can
+look entirely different, say an old screen and its redesign side by side. On the panel Blueprint's
+class defaults, under **Rage|UI|Rows**:
+
+| Property | Meaning |
+|---|---|
+| `ToggleRowClass`, `SliderRowClass`, `ComboRowClass`, `SelectionRowClass` | Used instead of the project defaults when set |
+| `SectionWidgetClass` | The header placed above each section, and above each keybind category on the input panel |
+| `RowClassOverrides` | A class for one property on this panel only. It wins over the project's `RowWidgetClassOverrides`, and decides combo or selection for an enum the same way |
+| `Sections` | Titled groups, each listing its properties in the order they should appear |
+| `UnlistedSectionTitle` | The title over properties no section names, such as fields a subclass added later. They list last, under no header while this is empty |
+
+A row class resolves in this order: the panel's `RowClassOverrides`, the project's
+`RowWidgetClassOverrides`, the panel's class for that kind of row, the project default. A section
+whose properties are all hidden or gone is skipped rather than left as a title over nothing.
+
 ### Localizing generated rows
 
 A generated row asks, in order, for its label:
@@ -268,6 +284,14 @@ would read differently in the editor and in the shipped game.
 
 Combo rows keep the text they were given rather than only the strings shown in the box, so a row
 built while the game was in one language rebuilds itself when the player picks another.
+
+Every row can also carry a **hint**, the short line under its label, and a **description**, the longer
+text a details pane shows while the row is highlighted. A generated row looks them up like its label,
+under `<Property>_Hint` and `<Property>_Description` (`bMuteWhenUnfocused_Hint`), after the
+descriptor's `Hint` / `Description` and the override's `DesiredHint` / `DesiredDescription`. Neither
+is derived from anything: a row nobody wrote a hint for has none. Hand-built rows get the same
+lookup through `RageSettingsUI::ApplyRowKey(Row, Key)`, which also gives the row `Key` as its id; the
+video panel calls it with each row's label key (`VSync_Hint`, `QualityPreset_Description`).
 
 ### Toggle (bool)
 
@@ -313,7 +337,8 @@ TArray<FRageSettingsRowDescriptor> UMyGameSettingsPanel::GetRowDescriptors() con
 
 `ERageSliderDisplayFormat`: `Raw` (`1.00`), `Percent` (`100%`), `Multiplier` (`1.00x`), `Integer`
 (`1`). Override `RefreshValueText` in Blueprint for anything more exotic (the shipped frame-rate row
-does this to show "Uncapped" at 0).
+does this to show "Uncapped" at 0), or `NativeFormatValue` in C++. `FormatValue` is the public face of
+the latter, for writing a range label in the same format as the readout beside it.
 
 Note the descriptor's clamp only bounds the **slider**; it is not a value clamp on the property. If a
 value must be clamped everywhere, add a typed `SetPendingX()` on your settings class that clamps —
@@ -381,12 +406,17 @@ ResolutionRow->SetSelectedIndex(Index);            // bNotify defaults to false
 resolution or a monitor name. `SetOptionTexts()` takes `FText`, which is what a generated row hands
 over, and is what lets the row rebuild its list in the player's new language.
 
+The row keeps the list and the selection itself (`GetOptionCount`, `GetOptionText`,
+`GetSelectedIndex`), and the `UComboBoxString` only mirrors them. That leaves the box optional: a
+subclass can draw its own dropdown, redraw it from `NativeOnOptionsChanged` and
+`NativeOnSelectionChanged`, and report the player's pick with `SetSelectedIndex(Index, true)`.
+
 **Widget contract** — Blueprint deriving `URageComboRow`:
 
 | Bind | Type | Required |
 |---|---|---|
-| `Label` | `UTextBlock` | yes |
-| `ComboBox` | `UComboBoxString` | yes |
+| `Label` | `UTextBlock` | optional |
+| `ComboBox` | `UComboBoxString` | optional |
 
 ### Keybinds
 
@@ -421,18 +451,37 @@ Requirements, in order:
 
 Runtime behaviour: clicking the row's remap button listens for the next key or mouse button (Escape
 cancels, focus loss cancels). If the chosen key is already used, `KeybindConflictModal` — if the
-panel binds one — asks first; confirming **clears** the conflicting action's binding (it shows as
-unbound), cancelling restores the row. Without a bound modal the rebind just goes through and the
-other action is left unbound silently.
+panel has one — asks first. The modal is handed a title, a message and a change list naming both
+bindings, before and after. Without a modal the rebind just goes through and the conflict is settled
+the way `bRebindConflictSwapsKey` says, silently.
 
-**Widget contract** — Blueprint deriving `URageKeybindRow` (note this derives `UUserWidget`
-directly, not `URageRowBaseUserWidget`):
+What the modal offers depends on the panel's `bOfferUnbindOnConflict`:
+
+- **Off** (the default): one way forward. Confirming swaps the keys when `bRebindConflictSwapsKey`
+  is set and the remapped action had a key to give, and otherwise **clears** the other action's
+  binding (it shows as unbound). Cancelling restores the row.
+- **On**: the modal's alternate choice is offered too. Confirm swaps and the alternate unbinds the
+  other action, and the panel relabels the two buttons to say so. When the remapped action had no
+  key to hand over there is nothing to swap, so confirming unbinds and the alternate goes away.
+
+A modal laid over the whole screen cannot live inside a panel that sits in a scroll box, so the view
+can hand its own down with `SetKeybindConflictModal`; `URageSettingsView` does this with its
+`KeybindConflictModal` bind.
+
+The keybind row is a regular row (it derives `URageRowBaseUserWidget`), so it carries a hint and a
+description and reports itself highlighted like the others. It never reports itself modified: a remap
+is saved the moment it is made, so the key it shows is always the applied one. `BeginListening` and
+`RequestResetToDefault` are public
+for a subclass that draws its own buttons, and the mouse button it waits for is caught in the preview
+pass, so a button still under the cursor cannot swallow that click.
+
+**Widget contract** — Blueprint deriving `URageKeybindRow`:
 
 | Bind | Type | Required |
 |---|---|---|
-| `Label` | `UTextBlock` | yes |
-| `RemapButton` | `UButton` | yes |
-| `KeyText` | `UTextBlock` | yes |
+| `Label` | `UTextBlock` | optional |
+| `RemapButton` | `UButton` | optional |
+| `KeyText` | `UTextBlock` | optional |
 | `ResetButton` | `UButton` | optional (per-row "reset to default") |
 
 C++/Blueprint API on `URageInputSettings`: `RemapPlayerKey`, `GetCurrentKeyForMapping`,
@@ -554,12 +603,33 @@ initializes every panel — but must:
 |---|---|---|
 | `CategorySwitcher` | `UWidgetSwitcher` | yes |
 | `GamePanel` / `AudioPanel` / `VideoPanel` / `InputPanel` | matching panel classes | yes |
-| `GameTabButton` / `AudioTabButton` / `VideoTabButton` / `InputTabButton` | `UButton` | yes |
-| `GameTabDirtyMarker` / `AudioTabDirtyMarker` / `VideoTabDirtyMarker` / `InputTabDirtyMarker` | `UWidget` | yes |
-| `ApplyButton` / `ResetToDefaultsButton` / `CloseButton` | `UButton` | yes |
+| `GameTabButton` / `AudioTabButton` / `VideoTabButton` / `InputTabButton` | `UButton` | optional |
+| `GameTabDirtyMarker` / `AudioTabDirtyMarker` / `VideoTabDirtyMarker` / `InputTabDirtyMarker` | `UWidget` | optional |
+| `ApplyButton` / `ResetToDefaultsButton` / `CloseButton` | `UButton` | optional |
 | `UnsavedChangesModal` | `URageUnsavedChangesModal` | optional (without it, closing discards nothing and prompts nothing) |
+| `RestartRequiredModal` | `URageConfirmModal` | optional |
+| `KeybindConflictModal` | `URageConfirmModal` | optional, handed to the input panel |
 
 `DefaultCategory` (EditDefaultsOnly) picks the tab shown first.
+
+The tabs, footer and markers are optional so a subclass can draw them with widgets of its own and
+drive the view through its public functions instead: `ShowCategory`, `CycleCategory`, `ApplyAll`,
+`ResetActiveCategoryToDefaults`, `RequestClose`, `CanApply`, `IsCategoryDirty`. The protected native
+hooks `NativeOnCategoryShown`, `NativeOnCategoryDirtyChanged`, `NativeOnApplyAvailabilityChanged`,
+`NativeOnModifiedRowsChanged` and `NativeOnRowHighlighted` tell it when to redraw.
+
+**Changed rows.** The view keeps every row its panels hold. Whenever a category has nothing pending,
+its rows are showing exactly what is applied, so the view takes their values as a baseline
+(`CaptureBaseline` on each row). A row that moves off its baseline reports itself modified, which is
+what lets a screen mark the exact rows a player changed rather than only the tab. `GetModifiedRows`,
+`GetModifiedRowCount` and `BuildModifiedChanges` read them back, and before the unsaved-changes
+prompt opens, `NativePopulateUnsavedChangesModal` hands it the change list. The base leaves the
+prompt's wording alone, so a Blueprint with its own text keeps it.
+
+**Highlighting.** A row the pointer or the keyboard focus lands on announces itself, and the view
+passes it on through `NativeOnRowHighlighted` and the `OnRowHighlighted` event, for a details pane
+to describe. Showing a tab highlights its first setting row, so the pane never describes something
+off screen.
 
 Panels:
 
@@ -570,17 +640,52 @@ Panels:
 | `URageInputSettingsPanel` | `RowsContainer`, `KeybindListContainer`; `KeybindConflictModal` optional; `KeybindRowClass` set |
 | `URageVideoSettingsPanel` | `ScalabilityContainer` + `ScalabilityRowClass`; every other row optional |
 
-Modals derive `URageModalBase` (`Open` / `Close` / `IsOpen` / `SetMessage`, with the
-`OnModalOpenStateChanged` Blueprint event for animations; `MessageText` bind is optional):
+Modals derive `URageModalBase` (`Open` / `Close` / `IsOpen`, plus `SetTitle`, `SetMessage` and
+`SetChanges`, with the `OnModalOpenStateChanged` Blueprint event for animations; `TitleText` and
+`MessageText` binds are optional). A change is an `FRageModalChange`: a label, the value before, the
+value after, and `bWarning` for a change the player would get without asking for it, like the other
+binding in a swap. A native subclass redraws from `NativeOnContentChanged` and
+`NativeOnOpenStateChanged`.
 
-- `URageConfirmModal` — binds `ConfirmButton`, `CancelButton`. Generic two-choice prompt; used for
-  keybind conflicts but not keybind-specific.
-- `URageUnsavedChangesModal` — binds `ApplyAndCloseButton`, `DiscardAndCloseButton`, `CancelButton`.
+- `URageConfirmModal` — binds `ConfirmButton`, `AlternateButton`, `CancelButton`, all optional. A
+  generic prompt, used for keybind conflicts and the restart prompt but specific to neither. The
+  alternate is a third answer the caller offers with `SetAlternateChoiceOffered`, and
+  `SetChoiceLabels` renames confirm and alternate for callers whose choices change meaning.
+- `URageUnsavedChangesModal` — binds `ApplyAndCloseButton`, `DiscardAndCloseButton`, `CancelButton`,
+  all optional.
+
+Every answer is also a public function (`ChooseConfirm`, `ChooseAlternate`, `ChooseCancel`,
+`ChooseApplyAndClose`, `ChooseDiscardAndClose`), so a subclass with buttons of its own answers
+through those.
 
 The plugin ships working Blueprints for all of these under `/RageSettings/` (`W_Settings_View`,
 `W_ToggleRow_View`, `W_SliderRow_View`, `W_ComboRow_View`, `W_SelectionRow_View`, `W_KeybindRow_View`,
 `W_Category_View`, `W_Pip_View`, `W_PipElement`, `W_Confirm_View`, `W_UnsavedChanges_View`, and the
 four panel widgets). They're plain starting points — reparent or replace them.
+
+### Extending a row in C++
+
+The Blueprint events above are enough to restyle a row. A native subclass that wants to draw a row
+its own way (a switch instead of a checkbox, a sliding value instead of a text swap) gets these
+hooks, all protected and all no-ops by default:
+
+| Class | Hook | When |
+|---|---|---|
+| `URageRowBaseUserWidget` | `NativeOnRowEnabledChanged(bool)` | After `SetRowEnabled` has applied |
+| `URageRowBaseUserWidget` | `NativeOnTextsChanged()` | The label, hint, description or disabled reason changed |
+| `URageRowBaseUserWidget` | `NativeOnModifiedChanged(bool)` | The row moved on or off its baseline |
+| `URageRowBaseUserWidget` | `GetValueKey()`, `GetValueText()` | Override in a new kind of row: a key that compares equal for equal values, and the value as the player reads it. An empty key marks a row that holds no setting, such as a header |
+| `URageRowBaseUserWidget` | `PresentationChangedDelegate` | Anything a row's frame draws from changed, hover and focus included, for one widget that dresses every kind of row |
+| `URageSliderRow` | `NativeOnRangeChanged()`, `NativeFormatValue(float)` | The range or format changed; the text a value reads as |
+| `URageComboRow` | `NativeOnOptionsChanged()`, `NativeOnSelectionChanged()` | The list was replaced or retranslated; the selection moved |
+| `URageKeybindRow` | `NativeOnListeningChanged(bool)`, `NativeOnKeyTextChanged(FText)` | Listening started or stopped; the key cap's text changed |
+| `URageToggleRow` | `NativeOnToggleChanged(bool)` | On `SetValue` as well as on a click, since `UCheckBox` only broadcasts clicks |
+| `URageSelectionRow` | `GetOptions()`, `GetLeftButton()`, `GetRightButton()` | Any time, for a subclass that draws the value and arrows itself |
+| `URageSelectionRow` | `GetStepDirection()` | During `RefreshSelection`: +1 or -1 for an arrow step, 0 for a direct set or a pip click |
+| `URagePipElement` | `NativeOnPipStateChanged`, `NativeOnSlotAssigned` | The native halves of the two Blueprint events, run before them |
+
+`RefreshSelection` is already a `BlueprintNativeEvent`, so a subclass overrides
+`RefreshSelection_Implementation` and calls `Super` to keep the arrows and pips in step.
 
 ---
 

@@ -81,6 +81,18 @@ void URageSelectionRow::RefreshSelection_Implementation()
 	Right_Button->SetIsEnabled(bCanCycle && (bWrapAround || SelectedIndex < Options.Num() - 1));
 
 	PipView->SetSelectedIndex(SelectedIndex);
+
+	RefreshModified();
+}
+
+FString URageSelectionRow::GetValueKey() const
+{
+	return FString::FromInt(SelectedIndex);
+}
+
+FText URageSelectionRow::GetValueText() const
+{
+	return Options.IsValidIndex(SelectedIndex) ? Options[SelectedIndex] : FText::GetEmpty();
 }
 
 void URageSelectionRow::HandleLeftClicked()
@@ -110,5 +122,27 @@ void URageSelectionRow::CycleSelection(int8 Direction)
 		? (SelectedIndex + Direction + Count) % Count
 		: FMath::Clamp(SelectedIndex + Direction, 0, Count - 1);
 
+	StepDirection = Direction;
 	SetSelectedIndex(NextIndex, /*bNotify*/ true);
+	StepDirection = 0;
+}
+
+const TArray<FText>& URageSelectionRow::GetOptions() const
+{
+	return Options;
+}
+
+int8 URageSelectionRow::GetStepDirection() const
+{
+	return StepDirection;
+}
+
+UButton* URageSelectionRow::GetLeftButton() const
+{
+	return Left_Button;
+}
+
+UButton* URageSelectionRow::GetRightButton() const
+{
+	return Right_Button;
 }

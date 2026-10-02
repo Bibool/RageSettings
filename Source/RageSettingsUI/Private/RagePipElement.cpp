@@ -18,6 +18,7 @@ void URagePipElement::SetPipState(ERagePipState NewState)
 	}
 
 	PipState = NewState;
+	NativeOnPipStateChanged(PipState);
 	OnPipStateChanged(PipState);
 }
 
@@ -40,5 +41,20 @@ void URagePipElement::NativeConstruct()
 {
 	Super::NativeConstruct();
 
+	NativeOnPipStateChanged(PipState);
 	OnPipStateChanged(PipState);
+}
+
+void URagePipElement::AssignSlot(UPanelSlot* BaseSlot)
+{
+	NativeOnSlotAssigned(BaseSlot);
+	OnSlotAssigned(BaseSlot);
+}
+
+void URagePipElement::NativeOnSlotAssigned(UPanelSlot* BaseSlot)
+{
+}
+
+void URagePipElement::NativeOnPipStateChanged(ERagePipState NewState)
+{
 }

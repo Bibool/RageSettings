@@ -32,7 +32,7 @@ void URagePipView::SetPipCount(int32 NewPipCount)
 		}
 
 		Pip->Setup(Index);
-		Pip->OnSlotAssigned(PipContainer->AddChild(Pip));
+		Pip->AssignSlot(PipContainer->AddChild(Pip));
 		Pips.Add(Pip);
 		Pip->PipClickedDelegate.AddDynamic(this, &URagePipView::HandlePipClicked);
 	}

@@ -13,6 +13,7 @@ class URageKeybindRow;
 class URageConfirmModal;
 class UPanelWidget;
 struct FRageKeybindConfig;
+struct FRageModalChange;
 
 /**
  * Input settings panel. Analog/toggle rows (sensitivity, inversion, and any project-subclass-
@@ -33,6 +34,12 @@ public:
 	virtual ERageSettingsCategory GetCategoryId() const override { return ERageSettingsCategory::Input; }
 	//~ End IRageSettingsPanel
 
+	/** Uses NewModal for keybind conflicts in place of the one this panel was built with. A modal belongs
+	 * over the whole screen, which a panel sitting inside a scroll box cannot give it, so the view that
+	 * owns the screen hands its own down. */
+	UFUNCTION(BlueprintCallable, Category = "Rage|Input")
+	void SetKeybindConflictModal(URageConfirmModal* NewModal);
+
 protected:
 	virtual void NativeConstruct() override;
 
@@ -49,6 +56,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Rage|Input")
 	TSubclassOf<URageKeybindRow> KeybindRowClass = nullptr;
 
+	/** Lets the player pick between swapping keys and unbinding the other action, through the conflict
+	 * modal's alternate choice. Off leaves the pick to bRebindConflictSwapsKey and the modal only confirms. */
+	UPROPERTY(EditDefaultsOnly, Category = "Rage|Input")
+	bool bOfferUnbindOnConflict = false;
+
 private:
 	void BuildKeybindRows();
 
@@ -57,17 +69,26 @@ private:
 	void RefreshKeyForMapping(FName MappingName) const;
 
 	/** Applies the stashed remap and, if it took, rehomes whoever was holding the key. */
-	void CommitPendingRemap();
+	void CommitPendingRemap(bool bSwap);
 
 	bool ApplyRemap(FName MappingName, FKey NewKey);
 
-	/** Hands the displaced action the freed key, or unbinds it - see bRebindConflictSwapsKey. */
-	void ResolveConflictingMappings();
+	/** Hands the first displaced action the freed key when bSwap, and unbinds the rest. */
+	void ResolveConflictingMappings(bool bSwap);
 
 	/** Whether the pending remap will hand its old key over rather than leaving the other unbound. */
 	bool WillSwapConflictingKey() const;
 
+	/* Whether the modal asks swap or unbind, rather than confirming the one bRebindConflictSwapsKey picked. */
+	bool ShouldOfferConflictChoice() const;
+
+	FText GetMappingDisplayName(FName MappingName) const;
+
 	FText BuildConflictMessage() const;
+
+	TArray<FRageModalChange> BuildConflictChanges(bool bSwap) const;
+
+	void BindConflictModal();
 
 	void ClearPendingRemap();
 
@@ -79,6 +100,9 @@ private:
 
 	UFUNCTION()
 	void HandleConflictConfirmed();
+
+	UFUNCTION()
+	void HandleConflictAlternateChosen();
 
 	UFUNCTION()
 	void HandleConflictCancelled();

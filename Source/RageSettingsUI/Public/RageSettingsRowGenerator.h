@@ -7,11 +7,14 @@
 #include "RageSliderDisplayFormat.h"
 
 class UEnum;
+class URageRowBaseUserWidget;
 
 struct FRageSettingsRowDescriptor
 {
 	FName PropertyName = NAME_None;
 	FText Label = FText::GetEmpty();
+	FText Hint = FText::GetEmpty();
+	FText Description = FText::GetEmpty();
 	float ClampMin = 0.f;
 	float ClampMax = 1.f;
 	ERageSliderDisplayFormat SliderFormat = ERageSliderDisplayFormat::Raw;
@@ -41,6 +44,16 @@ namespace RageSettingsUI
 	 * The string tables are the only step that survives cooking, since a UPROPERTY's metadata is
 	 * editor-only, so a field that has to read in more than one language needs an entry in one. */
 	RAGESETTINGSUI_API FText ResolveRowLabel(const FProperty* Property, const FRageSettingsRowDescriptor* Descriptor);
+
+	/** The line under a generated row's label and the longer text a details pane shows for it, looked up
+	 * like the label but against the keys <Property>_Hint and <Property>_Description, and never derived:
+	 * a row nobody wrote a hint for has none. */
+	RAGESETTINGSUI_API FText ResolveRowHint(const FProperty* Property, const FRageSettingsRowDescriptor* Descriptor);
+	RAGESETTINGSUI_API FText ResolveRowDescription(const FProperty* Property, const FRageSettingsRowDescriptor* Descriptor);
+
+	/** Gives a hand-built row the id Key, and the hint and description a string table keeps under
+	 * Key_Hint and Key_Description. Whatever the row was authored with stays when no table has them. */
+	RAGESETTINGSUI_API void ApplyRowKey(URageRowBaseUserWidget* Row, FName Key);
 
 	/** The option labels for an enum-backed row, one per entry and in the order the row shows them,
 	 * so an index into this array is an index into the enum. @see ResolveRowLabel for the lookup. */

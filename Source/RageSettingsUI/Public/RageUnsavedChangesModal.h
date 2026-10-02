@@ -9,40 +9,50 @@
 
 class UButton;
 
+/* Asked when the player leaves with changes pending. The buttons are optional so a subclass can draw its own and answer through the Choose functions. */
 UCLASS(Abstract, meta=(DisableNativeTick))
 class RAGESETTINGSUI_API URageUnsavedChangesModal : public URageModalBase
 {
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(BlueprintAssignable, Category = "Rage|Delegates") 
+	UFUNCTION(BlueprintCallable, Category = "Rage|UI")
+	void ChooseApplyAndClose();
+
+	UFUNCTION(BlueprintCallable, Category = "Rage|UI")
+	void ChooseDiscardAndClose();
+
+	UFUNCTION(BlueprintCallable, Category = "Rage|UI")
+	void ChooseCancel();
+
+	UPROPERTY(BlueprintAssignable, Category = "Rage|Delegates")
 	FRageModalChoiceMade ApplyAndCloseChosenDelegate;
-	
-	UPROPERTY(BlueprintAssignable, Category = "Rage|Delegates") 
+
+	UPROPERTY(BlueprintAssignable, Category = "Rage|Delegates")
 	FRageModalChoiceMade DiscardAndCloseChosenDelegate;
-	
-	UPROPERTY(BlueprintAssignable, Category = "Rage|Delegates") 
+
+	UPROPERTY(BlueprintAssignable, Category = "Rage|Delegates")
 	FRageModalChoiceMade CancelChosenDelegate;
 
 protected:
 	virtual void NativeConstruct() override;
 
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidget)) 
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UButton> ApplyAndCloseButton = nullptr;
-	
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidget)) 
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UButton> DiscardAndCloseButton = nullptr;
-	
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidget)) 
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UButton> CancelButton = nullptr;
 
 private:
-	UFUNCTION() 
+	UFUNCTION()
 	void HandleApplyAndCloseClicked();
-	
-	UFUNCTION() 
+
+	UFUNCTION()
 	void HandleDiscardAndCloseClicked();
-	
-	UFUNCTION() 
+
+	UFUNCTION()
 	void HandleCancelClicked();
 };

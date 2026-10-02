@@ -13,17 +13,24 @@ void URageKeybindRow::Setup(FName InMappingName, const FText& NewLabel)
 {
 	MappingName = InMappingName;
 
-	Label->SetText(NewLabel);
-	OnLabelTextSet(NewLabel);
+	SetRowId(InMappingName);
+	SetLabel(NewLabel);
 }
 
 void URageKeybindRow::SetCurrentKey(FKey NewKey)
 {
 	CurrentKey = NewKey;
-	
-	const FText DesiredText = NewKey.IsValid() ? NewKey.GetDisplayName() : RAGE_LOC("KeyUnbound");
-	KeyText->SetText(DesiredText);
-	OnKeyTextSet(DesiredText);
+
+	ShowKeyText(GetValueText());
+
+	/* A remap is saved the moment it is made, outside the pending and apply cycle, so whatever key the row
+	 * shows is already the applied one and the row never has anything waiting on Apply. */
+	CaptureBaseline();
+}
+
+FKey URageKeybindRow::GetCurrentKey() const
+{
+	return CurrentKey;
 }
 
 FName URageKeybindRow::GetMappingName() const
@@ -41,12 +48,15 @@ void URageKeybindRow::NativeConstruct()
 	Super::NativeConstruct();
 
 	SetIsFocusable(true);
-	
-	RemapButton->OnClicked.AddDynamic(this, &URageKeybindRow::HandleRemapButtonClicked);
-	
+
+	if (IsValid(RemapButton))
+	{
+		RemapButton->OnClicked.AddUniqueDynamic(this, &URageKeybindRow::HandleRemapButtonClicked);
+	}
+
 	if (IsValid(ResetButton))
 	{
-		ResetButton->OnClicked.AddDynamic(this, &URageKeybindRow::HandleResetButtonClicked);
+		ResetButton->OnClicked.AddUniqueDynamic(this, &URageKeybindRow::HandleResetButtonClicked);
 	}
 }
 
@@ -63,33 +73,54 @@ FReply URageKeybindRow::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyE
 		{
 			TryCommitKey(PressedKey);
 		}
-		
+
 		return FReply::Handled();
 	}
-	
+
 	return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
 }
 
-FReply URageKeybindRow::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+FReply URageKeybindRow::NativeOnPreviewMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
+	/* The preview pass reaches the row before any button inside it, so a key button that is still clickable
+	 * cannot take the very click the row is waiting for. */
 	if (bListeningForInput)
 	{
 		TryCommitKey(InMouseEvent.GetEffectingButton());
-		
+
 		return FReply::Handled();
 	}
-	
-	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+
+	return Super::NativeOnPreviewMouseButtonDown(InGeometry, InMouseEvent);
 }
 
 void URageKeybindRow::NativeOnFocusLost(const FFocusEvent& InFocusEvent)
 {
 	Super::NativeOnFocusLost(InFocusEvent);
-	
+
 	if (bListeningForInput)
 	{
 		EndListening(true);
 	}
+}
+
+FString URageKeybindRow::GetValueKey() const
+{
+	/* An unbound key names itself None rather than nothing, so an unbound row still counts as a setting. */
+	return CurrentKey.GetFName().ToString();
+}
+
+FText URageKeybindRow::GetValueText() const
+{
+	return CurrentKey.IsValid() ? CurrentKey.GetDisplayName() : RAGE_LOC("KeyUnbound");
+}
+
+void URageKeybindRow::NativeOnListeningChanged(bool bListening)
+{
+}
+
+void URageKeybindRow::NativeOnKeyTextChanged(const FText& NewKeyText)
+{
 }
 
 void URageKeybindRow::HandleRemapButtonClicked()
@@ -100,21 +131,31 @@ void URageKeybindRow::HandleRemapButtonClicked()
 	}
 }
 
-void URageKeybindRow::HandleResetButtonClicked()
+void URageKeybindRow::RequestResetToDefault()
 {
 	ResetToDefaultRequestedDelegate.Broadcast(MappingName);
 }
 
+void URageKeybindRow::HandleResetButtonClicked()
+{
+	RequestResetToDefault();
+}
+
 void URageKeybindRow::BeginListening()
 {
+	if (bListeningForInput)
+	{
+		return;
+	}
+
 	bListeningForInput = true;
 
-	const FText DesiredText = RAGE_LOC("PressAnyKey");
-	KeyText->SetText(DesiredText);
-	OnKeyTextSet(DesiredText);
+	ShowKeyText(RAGE_LOC("PressAnyKey"));
 
 	SetButtonsEnabled(false);
 	SetKeyboardFocus();
+
+	NativeOnListeningChanged(true);
 }
 
 void URageKeybindRow::EndListening(bool bCancelled)
@@ -127,11 +168,16 @@ void URageKeybindRow::EndListening(bool bCancelled)
 	{
 		SetCurrentKey(CurrentKey);
 	}
+
+	NativeOnListeningChanged(false);
 }
 
 void URageKeybindRow::SetButtonsEnabled(bool bEnabled)
 {
-	RemapButton->SetIsEnabled(bEnabled);
+	if (IsValid(RemapButton))
+	{
+		RemapButton->SetIsEnabled(bEnabled);
+	}
 
 	if (IsValid(ResetButton))
 	{
@@ -150,4 +196,15 @@ void URageKeybindRow::TryCommitKey(FKey NewKey)
 	EndListening(false);
 	SetCurrentKey(NewKey);
 	KeyRemappedDelegate.Broadcast(MappingName, NewKey);
+}
+
+void URageKeybindRow::ShowKeyText(const FText& NewKeyText)
+{
+	if (IsValid(KeyText))
+	{
+		KeyText->SetText(NewKeyText);
+	}
+
+	OnKeyTextSet(NewKeyText);
+	NativeOnKeyTextChanged(NewKeyText);
 }

@@ -47,7 +47,10 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Rage|UI")
 	bool IsFilled() const;
-	
+
+	/* Called by the strip once the pip is in its container, so the slot can be laid out. */
+	void AssignSlot(UPanelSlot* BaseSlot);
+
 	UFUNCTION(BlueprintImplementableEvent, Category = "Rage|UI")
 	void OnSlotAssigned(UPanelSlot* BaseSlot);
 	
@@ -56,7 +59,11 @@ public:
 
 protected:
 	virtual void NativeConstruct() override;
-	
+
+	/* Native halves of OnSlotAssigned and OnPipStateChanged, run before the Blueprint events. */
+	virtual void NativeOnSlotAssigned(UPanelSlot* BaseSlot);
+	virtual void NativeOnPipStateChanged(ERagePipState NewState);
+
 	UFUNCTION(BlueprintImplementableEvent, Category = "Rage|UI")
 	void OnPipStateChanged(ERagePipState NewState);
 

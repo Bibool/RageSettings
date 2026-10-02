@@ -7,6 +7,7 @@
 #include "RageMacros.h"
 #include "RageScalabilityCategory.h"
 #include "RageSelectionRow.h"
+#include "RageSettingsRowGenerator.h"
 #include "RageSettingsDeveloperSettings.h"
 #include "RageSettingsUIStatics.h"
 #include "RageVideoSettings.h"
@@ -80,26 +81,31 @@ void URageVideoSettingsPanel::NativeConstruct()
 	
 	IF_VALID(ResolutionRow)
 		ResolutionRow->SetLabel(RAGE_LOC("Resolution"));
+		RageSettingsUI::ApplyRowKey(ResolutionRow, TEXT("Resolution"));
 		ResolutionRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleResolutionChanged);
 	END_IF
 	
 	IF_VALID(MonitorRow)
 		MonitorRow->SetLabel(RAGE_LOC("Monitor"));
+		RageSettingsUI::ApplyRowKey(MonitorRow, TEXT("Monitor"));
 		MonitorRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleMonitorChanged);
 	END_IF
 
 	IF_VALID(WindowModeRow)
 		WindowModeRow->SetLabel(RAGE_LOC("WindowMode"));
+		RageSettingsUI::ApplyRowKey(WindowModeRow, TEXT("WindowMode"));
 		WindowModeRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleWindowModeChanged);
 	END_IF
 	
 	IF_VALID(VSyncRow)
 		VSyncRow->SetLabel(RAGE_LOC("VSync"));
+		RageSettingsUI::ApplyRowKey(VSyncRow, TEXT("VSync"));
 		VSyncRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleVSyncChanged);
 	END_IF
 	
 	IF_VALID(FrameRateLimitRow)
 		FrameRateLimitRow->SetLabel(RAGE_LOC("FrameRateLimit"));
+		RageSettingsUI::ApplyRowKey(FrameRateLimitRow, TEXT("FrameRateLimit"));
 		FrameRateLimitRow->SetRange(0.f, SETTINGS->FpsMax);
 
 		FrameRateLimitRow->SetDisplayFormat(ERageSliderDisplayFormat::Integer);
@@ -108,6 +114,7 @@ void URageVideoSettingsPanel::NativeConstruct()
 	
 	IF_VALID(ResolutionScaleRow)
 		ResolutionScaleRow->SetLabel(RAGE_LOC("ResolutionScale"));
+		RageSettingsUI::ApplyRowKey(ResolutionScaleRow, TEXT("ResolutionScale"));
 		ResolutionScaleRow->SetRange(0.1f, 1.f);
 	END_IF
 	
@@ -118,6 +125,7 @@ void URageVideoSettingsPanel::NativeConstruct()
 	
 	IF_VALID(BrightnessRow)
 		BrightnessRow->SetLabel(RAGE_LOC("Brightness"));
+		RageSettingsUI::ApplyRowKey(BrightnessRow, TEXT("Brightness"));
 		BrightnessRow->SetRange(SETTINGS->BrightnessMin, SETTINGS->BrightnessMax);
 	END_IF
 	
@@ -128,6 +136,7 @@ void URageVideoSettingsPanel::NativeConstruct()
 	
 	IF_VALID(FieldOfViewRow)
 		FieldOfViewRow->SetLabel(RAGE_LOC("FieldOfView"));
+		RageSettingsUI::ApplyRowKey(FieldOfViewRow, TEXT("FieldOfView"));
 		FieldOfViewRow->SetRange(SETTINGS->FieldOfViewMin, SETTINGS->FieldOfViewMax);
 		FieldOfViewRow->SetDisplayFormat(ERageSliderDisplayFormat::Integer);
 		FieldOfViewRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleFieldOfViewChanged);
@@ -135,11 +144,13 @@ void URageVideoSettingsPanel::NativeConstruct()
 	
 	IF_VALID(HDRRow)
 		HDRRow->SetLabel(RAGE_LOC("HDR"));
+		RageSettingsUI::ApplyRowKey(HDRRow, TEXT("HDR"));
 		HDRRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleHDRChanged);
 	END_IF
 
 	IF_VALID(HDRNitsRow)
 		HDRNitsRow->SetLabel(RAGE_LOC("HDRNits"));
+		RageSettingsUI::ApplyRowKey(HDRNitsRow, TEXT("HDRNits"));
 		HDRNitsRow->SetOptions(RageSettingsUI::BuildEnumOptionsTexts<ERageHDRDisplayNits>(
 		{ ERageHDRDisplayNits::Nits1000, ERageHDRDisplayNits::Nits2000 }));
 		HDRNitsRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleHDRNitsChanged);
@@ -147,16 +158,19 @@ void URageVideoSettingsPanel::NativeConstruct()
 	
 	IF_VALID(GraphicsAPIRow)
 		GraphicsAPIRow->SetLabel(RAGE_LOC("GraphicsAPI"));
+		RageSettingsUI::ApplyRowKey(GraphicsAPIRow, TEXT("GraphicsAPI"));
 		GraphicsAPIRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleGraphicsAPIChanged);
 	END_IF
 
 	IF_VALID(AntiAliasingMethodRow)
 		AntiAliasingMethodRow->SetLabel(RAGE_LOC("AntiAliasingMethod"));
+		RageSettingsUI::ApplyRowKey(AntiAliasingMethodRow, TEXT("AntiAliasingMethod"));
 		AntiAliasingMethodRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleAntiAliasingMethodChanged);
 	END_IF
 
 	IF_VALID(MSAASampleCountRow)
 		MSAASampleCountRow->SetLabel(RAGE_LOC("MSAASampleCount"));
+		RageSettingsUI::ApplyRowKey(MSAASampleCountRow, TEXT("MSAASampleCount"));
 		MSAASampleCountRow->SetOptions(RageSettingsUI::BuildEnumOptionsTexts<ERageMSAASampleCount>(
 			{ ERageMSAASampleCount::x2, ERageMSAASampleCount::x4, ERageMSAASampleCount::x8 }));
 		MSAASampleCountRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleMSAASampleCountChanged);
@@ -164,6 +178,7 @@ void URageVideoSettingsPanel::NativeConstruct()
 
 	IF_VALID(QualityPresetRow)
 		QualityPresetRow->SetLabel(RAGE_LOC("QualityPreset"));
+		RageSettingsUI::ApplyRowKey(QualityPresetRow, TEXT("QualityPreset"));
 		QualityPresetRow->SetOptions(RageSettingsUI::BuildEnumOptionsTexts<ERageQualityPreset>(
 		{ ERageQualityPreset::Low, ERageQualityPreset::Medium, ERageQualityPreset::High, ERageQualityPreset::Epic, ERageQualityPreset::Custom }));
 		QualityPresetRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleQualityPresetChanged);
@@ -173,56 +188,67 @@ void URageVideoSettingsPanel::NativeConstruct()
 
 	IF_VALID(RayTracingMasterRow)
 		RayTracingMasterRow->SetLabel(RAGE_LOC("RayTracingMaster"));
+		RageSettingsUI::ApplyRowKey(RayTracingMasterRow, TEXT("RayTracingMaster"));
 		RayTracingMasterRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleRayTracingMasterChanged);
 	END_IF
 	
 	IF_VALID(RTShadowsRow)
 		RTShadowsRow->SetLabel(RAGE_LOC("RayTracingShadows"));
+		RageSettingsUI::ApplyRowKey(RTShadowsRow, TEXT("RayTracingShadows"));
 		RTShadowsRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleRTShadowsChanged);
 	END_IF
 	
 	IF_VALID(RTReflectionsRow)
 		RTReflectionsRow->SetLabel(RAGE_LOC("RayTracingReflections"));
+		RageSettingsUI::ApplyRowKey(RTReflectionsRow, TEXT("RayTracingReflections"));
 		RTReflectionsRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleRTReflectionsChanged);
 	END_IF
 	
 	IF_VALID(RTGlobalIlluminationRow)
 		RTGlobalIlluminationRow->SetLabel(RAGE_LOC("RayTracingGlobalIllumination"));
+		RageSettingsUI::ApplyRowKey(RTGlobalIlluminationRow, TEXT("RayTracingGlobalIllumination"));
 		RTGlobalIlluminationRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleRTGlobalIlluminationChanged);
 	END_IF
 	
 	IF_VALID(RTAmbientOcclusionRow)
 		RTAmbientOcclusionRow->SetLabel(RAGE_LOC("RayTracingAmbientOcclusion"));
+		RageSettingsUI::ApplyRowKey(RTAmbientOcclusionRow, TEXT("RayTracingAmbientOcclusion"));
 		RTAmbientOcclusionRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleRTAmbientOcclusionChanged);
 	END_IF
 	
 	IF_VALID(RTTranslucencyRow)
 		RTTranslucencyRow->SetLabel(RAGE_LOC("RayTracingTranslucency"));
+		RageSettingsUI::ApplyRowKey(RTTranslucencyRow, TEXT("RayTracingTranslucency"));
 		RTTranslucencyRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleRTTranslucencyChanged);
 	END_IF
 	
 	IF_VALID(UpscalerMethodRow)
 		UpscalerMethodRow->SetLabel(RAGE_LOC("UpscalerMethod"));
+		RageSettingsUI::ApplyRowKey(UpscalerMethodRow, TEXT("UpscalerMethod"));
 		UpscalerMethodRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleUpscalerMethodChanged);
 	END_IF
 	
 	IF_VALID(DLSSModeRow)
 		DLSSModeRow->SetLabel(RAGE_LOC("DLSSMode"));
+		RageSettingsUI::ApplyRowKey(DLSSModeRow, TEXT("DLSSMode"));
 		DLSSModeRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleDLSSModeChanged);
 	END_IF
 	
 	IF_VALID(DLSSFrameGenRow)
 		DLSSFrameGenRow->SetLabel(RAGE_LOC("DLSSFrameGeneration"));
+		RageSettingsUI::ApplyRowKey(DLSSFrameGenRow, TEXT("DLSSFrameGeneration"));
 		DLSSFrameGenRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleDLSSFrameGenChanged);
 	END_IF
 	
 	IF_VALID(DLSSRayReconstructionRow)
 		DLSSRayReconstructionRow->SetLabel(RAGE_LOC("DLSSRayReconstruction"));
+		RageSettingsUI::ApplyRowKey(DLSSRayReconstructionRow, TEXT("DLSSRayReconstruction"));
 		DLSSRayReconstructionRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleDLSSRayReconstructionChanged);
 	END_IF
 	
 	IF_VALID(FSRModeRow)
 		FSRModeRow->SetLabel(RAGE_LOC("FSRMode"));
+		RageSettingsUI::ApplyRowKey(FSRModeRow, TEXT("FSRMode"));
 		FSRModeRow->SetOptions(RageSettingsUI::BuildEnumOptionsTexts<ERageFSRMode>(
 			{ ERageFSRMode::UltraPerformance, ERageFSRMode::Performance, ERageFSRMode::Balanced, ERageFSRMode::Quality, ERageFSRMode::NativeAA }));
 		FSRModeRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleFSRModeChanged);
@@ -230,6 +256,7 @@ void URageVideoSettingsPanel::NativeConstruct()
 	
 	IF_VALID(FSRSharpnessRow)
 		FSRSharpnessRow->SetLabel(RAGE_LOC("FSRSharpness"));
+		RageSettingsUI::ApplyRowKey(FSRSharpnessRow, TEXT("FSRSharpness"));
 		FSRSharpnessRow->SetRange(0.f, 1.f);
 		FSRSharpnessRow->SetDisplayFormat(ERageSliderDisplayFormat::Percent);
 		FSRSharpnessRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleFSRSharpnessChanged);
@@ -237,21 +264,25 @@ void URageVideoSettingsPanel::NativeConstruct()
 	
 	IF_VALID(FSRFrameInterpolationRow)
 		FSRFrameInterpolationRow->SetLabel(RAGE_LOC("FSRFrameInterpolation"));
+		RageSettingsUI::ApplyRowKey(FSRFrameInterpolationRow, TEXT("FSRFrameInterpolation"));
 		FSRFrameInterpolationRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleFSRFrameInterpolationChanged);
 	END_IF
 	
 	IF_VALID(XeSSModeRow)
 		XeSSModeRow->SetLabel(RAGE_LOC("XESSMode"));
+		RageSettingsUI::ApplyRowKey(XeSSModeRow, TEXT("XESSMode"));
 		XeSSModeRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleXeSSModeChanged);
 	END_IF
 	
 	IF_VALID(XeSSFrameGenRow)
 		XeSSFrameGenRow->SetLabel(RAGE_LOC("XESSFrameGeneration"));
+		RageSettingsUI::ApplyRowKey(XeSSFrameGenRow, TEXT("XESSFrameGeneration"));
 		XeSSFrameGenRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleXeSSFrameGenChanged);
 	END_IF
 	
 	IF_VALID(ReflexModeRow)
 		ReflexModeRow->SetLabel(RAGE_LOC("ReflexMode"));
+		RageSettingsUI::ApplyRowKey(ReflexModeRow, TEXT("ReflexMode"));
 		ReflexModeRow->SetOptions(RageSettingsUI::BuildEnumOptionsTexts<ERageReflexMode>(
 			{ ERageReflexMode::Disabled, ERageReflexMode::Enabled, ERageReflexMode::EnabledPlusBoost }));
 		ReflexModeRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleReflexModeChanged);
@@ -259,26 +290,31 @@ void URageVideoSettingsPanel::NativeConstruct()
 	
 	IF_VALID(XeLLRow)
 		XeLLRow->SetLabel(RAGE_LOC("XELL"));
+		RageSettingsUI::ApplyRowKey(XeLLRow, TEXT("XELL"));
 		XeLLRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleXeLLChanged);
 	END_IF
 	
 	IF_VALID(MotionBlurRow)
 		MotionBlurRow->SetLabel(RAGE_LOC("MotionBlur"));
+		RageSettingsUI::ApplyRowKey(MotionBlurRow, TEXT("MotionBlur"));
 		MotionBlurRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleMotionBlurChanged);
 	END_IF
 	
 	IF_VALID(DepthOfFieldRow)
 		DepthOfFieldRow->SetLabel(RAGE_LOC("DepthOfField"));
+		RageSettingsUI::ApplyRowKey(DepthOfFieldRow, TEXT("DepthOfField"));
 		DepthOfFieldRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleDepthOfFieldChanged);
 	END_IF
 	
 	IF_VALID(FilmGrainRow)
 		FilmGrainRow->SetLabel(RAGE_LOC("FilmGrain"));
+		RageSettingsUI::ApplyRowKey(FilmGrainRow, TEXT("FilmGrain"));
 		FilmGrainRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleFilmGrainChanged);
 	END_IF
 	
 	IF_VALID(ChromaticAberrationRow)
 		ChromaticAberrationRow->SetLabel(RAGE_LOC("ChromaticAberration"));
+		RageSettingsUI::ApplyRowKey(ChromaticAberrationRow, TEXT("ChromaticAberration"));
 		ChromaticAberrationRow->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleChromaticAberrationChanged);
 	END_IF
 }
@@ -667,7 +703,7 @@ void URageVideoSettingsPanel::BuildScalabilityRows()
 		Row->ValueChangedDelegate.AddUObject(this, &URageVideoSettingsPanel::HandleScalabilityChanged);
 
 		const FName RowId = IsValid(CategoryEnum) ? FName(*CategoryEnum->GetNameStringByValue(static_cast<int64>(Def.Key))) : NAME_None;
-		Row->SetRowId(RowId);
+		RageSettingsUI::ApplyRowKey(Row, RowId);
 
 		ScalabilityContainer->AddChild(Row);
 		ScalabilityRows.Add(Row);

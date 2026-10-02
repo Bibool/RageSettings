@@ -4,6 +4,7 @@
 #include "RageSettingsRowGenerator.h"
 
 #include "RageComboRow.h"
+#include "RageRowBaseUserWidget.h"
 #include "RageSelectionRow.h"
 #include "RageSettingsUIDeveloperSettings.h"
 #include "Algo/Reverse.h"
@@ -212,6 +213,66 @@ FText RageSettingsUI::ResolveRowLabel(const FProperty* Property, const FRageSett
 
 	const FText FromTable = FindStringTableText(Property->GetName());
 	return FromTable.IsEmpty() ? DeriveDefaultLabel(Property) : FromTable;
+}
+
+FText RageSettingsUI::ResolveRowHint(const FProperty* Property, const FRageSettingsRowDescriptor* Descriptor)
+{
+	if (Descriptor && !Descriptor->Hint.IsEmpty())
+	{
+		return Descriptor->Hint;
+	}
+
+	if (const FRageRowOverrideData* Override = FindRowOverride(Property))
+	{
+		if (!Override->DesiredHint.IsEmpty())
+		{
+			return Override->DesiredHint;
+		}
+	}
+
+	return Property ? FindStringTableText(Property->GetName() + TEXT("_Hint")) : FText::GetEmpty();
+}
+
+FText RageSettingsUI::ResolveRowDescription(const FProperty* Property, const FRageSettingsRowDescriptor* Descriptor)
+{
+	if (Descriptor && !Descriptor->Description.IsEmpty())
+	{
+		return Descriptor->Description;
+	}
+
+	if (const FRageRowOverrideData* Override = FindRowOverride(Property))
+	{
+		if (!Override->DesiredDescription.IsEmpty())
+		{
+			return Override->DesiredDescription;
+		}
+	}
+
+	return Property ? FindStringTableText(Property->GetName() + TEXT("_Description")) : FText::GetEmpty();
+}
+
+void RageSettingsUI::ApplyRowKey(URageRowBaseUserWidget* Row, const FName Key)
+{
+	if (!IsValid(Row) || Key.IsNone())
+	{
+		return;
+	}
+
+	Row->SetRowId(Key);
+
+	const FString KeyString = Key.ToString();
+
+	const FText Hint = FindStringTableText(KeyString + TEXT("_Hint"));
+	if (!Hint.IsEmpty())
+	{
+		Row->SetHint(Hint);
+	}
+
+	const FText Description = FindStringTableText(KeyString + TEXT("_Description"));
+	if (!Description.IsEmpty())
+	{
+		Row->SetDescription(Description);
+	}
 }
 
 TArray<FText> RageSettingsUI::BuildEnumOptionLabels(const FProperty* Property)

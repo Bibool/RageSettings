@@ -23,7 +23,14 @@ public:
 protected:
 	virtual void NativeConstruct() override;
 
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidget)) 
+	/** Called whenever the check state changes, from SetValue as well as from a click. UCheckBox only
+	 * broadcasts its own delegate for a click, so this is the one place a subclass sees both. */
+	virtual void NativeOnToggleChanged(bool bChecked);
+
+	virtual FString GetValueKey() const override;
+	virtual FText GetValueText() const override;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UCheckBox> CheckBox = nullptr;
 	
 private:

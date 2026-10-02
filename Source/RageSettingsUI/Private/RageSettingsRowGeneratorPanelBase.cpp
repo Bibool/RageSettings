@@ -18,41 +18,20 @@
 
 namespace
 {
+	const FRageRowOverrideData* FindProjectOverride(const FProperty* Property)
+	{
+		return URageSettingsUIDeveloperSettings::Get()->RowWidgetClassOverrides.Find(Property->GetFName());
+	}
+
 	bool ShouldCreateWidget(const FProperty* Property)
 	{
-		const URageSettingsUIDeveloperSettings* UISettings = URageSettingsUIDeveloperSettings::Get();
-		
-		if (const FRageRowOverrideData* Override = UISettings->RowWidgetClassOverrides.Find(Property->GetFName()))
-		{
-			return Override->bCreateWidget;
-		}
-		
-		return true;
+		const FRageRowOverrideData* Override = FindProjectOverride(Property);
+		return !Override || Override->bCreateWidget;
 	}
-	UClass* ResolveRowWidgetClass(const FProperty* Property, const UClass* ExpectedBase, UClass* ProjectDefault)
-	{
-		const URageSettingsUIDeveloperSettings* UISettings = URageSettingsUIDeveloperSettings::Get();
-		if (const FRageRowOverrideData* Override = UISettings->RowWidgetClassOverrides.Find(Property->GetFName()))
-		{
-			if (UClass* OverrideClass = Override->WidgetClass)
-			{
-				if (OverrideClass->IsChildOf(ExpectedBase))
-				{
-					return OverrideClass;
-				}
-				
-				S_LOG(Warning, "Rage Settings : RowWidgetClassOverrides[{property}] ({class}) doesn't derive from {base} - ignoring, falling back to the project defaults.",
-					*Property->GetName(), *OverrideClass->GetName(), *ExpectedBase->GetName());
-			}
-		}
 
-		return ProjectDefault;
-	}
-	
 	void TryOverrideObjectWidgetManipulation(const FProperty* Property, URageRowBaseUserWidget* InWidget)
 	{
-		const URageSettingsUIDeveloperSettings* UISettings = URageSettingsUIDeveloperSettings::Get();
-		if (const FRageRowOverrideData* Override = UISettings->RowWidgetClassOverrides.Find(Property->GetFName()))
+		if (const FRageRowOverrideData* Override = FindProjectOverride(Property))
 		{
 			if (IsValid(Override->OverrideObject))
 			{
@@ -74,95 +53,86 @@ void URageSettingsRowGeneratorPanelBase::BuildRows(UPanelWidget* Container, UObj
 	Container->ClearChildren();
 
 	const TArray<FRageSettingsRowDescriptor> Descriptors = GetRowDescriptors();
-	const URageSettingsUIDeveloperSettings* UISettings = URageSettingsUIDeveloperSettings::Get();
 
+	TArray<FProperty*> Properties;
 	for (FProperty* Property : RageSettingsUI::CollectRowProperties(PendingObject->GetClass()))
 	{
-		if (!ShouldCreateWidget(Property))
+		if (ShouldCreateWidget(Property) && ResolveKind(Property) != RageSettingsUI::ERowKind::Unsupported)
 		{
-			continue;
+			Properties.Add(Property);
+		}
+	}
+
+	auto AddRow = [this, Container, &Descriptors](FProperty* Property)
+	{
+		if (URageRowBaseUserWidget* Row = CreateRow(Property, Descriptors))
+		{
+			Container->AddChild(Row);
+		}
+	};
+
+	if (Sections.IsEmpty())
+	{
+		for (FProperty* Property : Properties)
+		{
+			AddRow(Property);
+		}
+	}
+	else
+	{
+		TSet<FProperty*> Listed;
+		for (int32 SectionIndex = 0; SectionIndex < Sections.Num(); ++SectionIndex)
+		{
+			const FRageSettingsSection& Section = Sections[SectionIndex];
+
+			TArray<FProperty*> SectionProperties;
+			for (const FName& Name : Section.Properties)
+			{
+				FProperty* const* Found = Properties.FindByPredicate([Name](const FProperty* Candidate) { return Candidate->GetFName() == Name; });
+				if (Found && !Listed.Contains(*Found))
+				{
+					SectionProperties.Add(*Found);
+					Listed.Add(*Found);
+				}
+			}
+
+			/* A section whose every field was hidden or removed would be a title over nothing. */
+			if (SectionProperties.IsEmpty())
+			{
+				continue;
+			}
+
+			AddSectionHeader(Container, Section.Title, SectionIndex);
+			for (FProperty* Property : SectionProperties)
+			{
+				AddRow(Property);
+			}
 		}
 
-		const RageSettingsUI::ERowKind Kind = RageSettingsUI::ResolveRowKind(Property);
-		if (Kind == RageSettingsUI::ERowKind::Unsupported)
+		bool bUnlistedHeaderAdded = false;
+		for (FProperty* Property : Properties)
 		{
-			continue;
-		}
-
-		const FRageSettingsRowDescriptor* Descriptor = Descriptors.FindByPredicate(
-			[Property](const FRageSettingsRowDescriptor& Candidate) { return Candidate.PropertyName == Property->GetFName(); });
-
-		const FText Label = RageSettingsUI::ResolveRowLabel(Property, Descriptor);
-
-		switch (Kind)
-		{
-			case RageSettingsUI::ERowKind::Toggle:
+			if (Listed.Contains(Property))
 			{
-				TSubclassOf<URageToggleRow> RowClass = ResolveRowWidgetClass(Property, URageToggleRow::StaticClass(), UISettings->DefaultToggleRowClass.Get());
-				if (URageToggleRow* Row = CreateWidget<URageToggleRow>(this, RowClass))
-				{
-					Row->SetLabel(Label);
-					Row->SetRowId(Property->GetFName());
-					Row->ValueChangedDelegate.AddUObject(this, &URageSettingsRowGeneratorPanelBase::HandleGeneratedToggleChanged);
-					TryOverrideObjectWidgetManipulation(Property, Row);
-					Container->AddChild(Row);
-				}
-				break;
+				continue;
 			}
-			case RageSettingsUI::ERowKind::Slider:
-			{
-				TSubclassOf<URageSliderRow> RowClass = ResolveRowWidgetClass(Property, URageSliderRow::StaticClass(), UISettings->DefaultSliderRowClass.Get());
-				if (URageSliderRow* Row = CreateWidget<URageSliderRow>(this, RowClass))
-				{
-					Row->SetLabel(Label);
-					Row->SetRowId(Property->GetFName());
-					if (Descriptor)
-					{
-						Row->SetRange(Descriptor->ClampMin, Descriptor->ClampMax);
-						Row->SetDisplayFormat(Descriptor->SliderFormat);
-					}
-					Row->ValueChangedDelegate.AddUObject(this, &URageSettingsRowGeneratorPanelBase::HandleGeneratedSliderChanged);
-					TryOverrideObjectWidgetManipulation(Property, Row);
-					Container->AddChild(Row);
-				}
-				break;
-			}
-			case RageSettingsUI::ERowKind::Combo:
-			{
-				TSubclassOf<URageComboRow> RowClass = ResolveRowWidgetClass(Property, URageComboRow::StaticClass(), UISettings->DefaultComboRowClass.Get());
-				if (URageComboRow* Row = CreateWidget<URageComboRow>(this, RowClass))
-				{
-					Row->SetLabel(Label);
-					Row->SetRowId(Property->GetFName());
 
-					Row->SetOptionTexts(RageSettingsUI::BuildEnumOptionLabels(Property));
-					Row->ValueChangedDelegate.AddUObject(this, &URageSettingsRowGeneratorPanelBase::HandleGeneratedComboChanged);
-					TryOverrideObjectWidgetManipulation(Property, Row);
-					Container->AddChild(Row);
-				}
-				break;
-			}
-			case RageSettingsUI::ERowKind::Selection:
+			if (!bUnlistedHeaderAdded)
 			{
-				TSubclassOf<URageSelectionRow> RowClass = ResolveRowWidgetClass(Property, URageSelectionRow::StaticClass(), UISettings->DefaultSelectionRowClass.Get());
-				if (URageSelectionRow* Row = CreateWidget<URageSelectionRow>(this, RowClass))
-				{
-					Row->SetLabel(Label);
-					Row->SetRowId(Property->GetFName());
-
-					Row->SetOptions(RageSettingsUI::BuildEnumOptionLabels(Property));
-					Row->ValueChangedDelegate.AddUObject(this, &URageSettingsRowGeneratorPanelBase::HandleGeneratedSelectionChanged);
-					TryOverrideObjectWidgetManipulation(Property, Row);
-					Container->AddChild(Row);
-				}
+				AddSectionHeader(Container, UnlistedSectionTitle, Sections.Num());
+				bUnlistedHeaderAdded = true;
 			}
-			break;
-			default:
-				break;
+
+			AddRow(Property);
 		}
 	}
 
 	RefreshRowsFromSettings(PendingObject);
+}
+
+TSubclassOf<URageRowBaseUserWidget> URageSettingsRowGeneratorPanelBase::GetSectionWidgetClass() const
+{
+	return SectionWidgetClass ? SectionWidgetClass : URageSettingsUIDeveloperSettings::Get()->DefaultCategoryWidgetClass;
 }
 
 void URageSettingsRowGeneratorPanelBase::RefreshFromSettings()
@@ -208,6 +178,174 @@ void URageSettingsRowGeneratorPanelBase::RefreshRowsFromSettings(const UObject* 
 			}
 		}
 	}
+}
+
+URageRowBaseUserWidget* URageSettingsRowGeneratorPanelBase::CreateRow(FProperty* Property, const TArray<FRageSettingsRowDescriptor>& Descriptors)
+{
+	const URageSettingsUIDeveloperSettings* UISettings = URageSettingsUIDeveloperSettings::Get();
+
+	const FRageSettingsRowDescriptor* Descriptor = Descriptors.FindByPredicate(
+		[Property](const FRageSettingsRowDescriptor& Candidate) { return Candidate.PropertyName == Property->GetFName(); });
+
+	URageRowBaseUserWidget* Row = nullptr;
+
+	switch (ResolveKind(Property))
+	{
+		case RageSettingsUI::ERowKind::Toggle:
+		{
+			const TSubclassOf<URageToggleRow> RowClass = ResolveRowClass(Property, URageToggleRow::StaticClass(), ToggleRowClass, UISettings->DefaultToggleRowClass);
+			if (URageToggleRow* ToggleRow = CreateWidget<URageToggleRow>(this, RowClass))
+			{
+				ToggleRow->ValueChangedDelegate.AddUObject(this, &URageSettingsRowGeneratorPanelBase::HandleGeneratedToggleChanged);
+				Row = ToggleRow;
+			}
+			break;
+		}
+		case RageSettingsUI::ERowKind::Slider:
+		{
+			const TSubclassOf<URageSliderRow> RowClass = ResolveRowClass(Property, URageSliderRow::StaticClass(), SliderRowClass, UISettings->DefaultSliderRowClass);
+			if (URageSliderRow* SliderRow = CreateWidget<URageSliderRow>(this, RowClass))
+			{
+				if (Descriptor)
+				{
+					SliderRow->SetRange(Descriptor->ClampMin, Descriptor->ClampMax);
+					SliderRow->SetDisplayFormat(Descriptor->SliderFormat);
+				}
+				SliderRow->ValueChangedDelegate.AddUObject(this, &URageSettingsRowGeneratorPanelBase::HandleGeneratedSliderChanged);
+				Row = SliderRow;
+			}
+			break;
+		}
+		case RageSettingsUI::ERowKind::Combo:
+		{
+			const TSubclassOf<URageComboRow> RowClass = ResolveRowClass(Property, URageComboRow::StaticClass(), ComboRowClass, UISettings->DefaultComboRowClass);
+			if (URageComboRow* ComboRow = CreateWidget<URageComboRow>(this, RowClass))
+			{
+				ComboRow->SetOptionTexts(RageSettingsUI::BuildEnumOptionLabels(Property));
+				ComboRow->ValueChangedDelegate.AddUObject(this, &URageSettingsRowGeneratorPanelBase::HandleGeneratedComboChanged);
+				Row = ComboRow;
+			}
+			break;
+		}
+		case RageSettingsUI::ERowKind::Selection:
+		{
+			const TSubclassOf<URageSelectionRow> RowClass = ResolveRowClass(Property, URageSelectionRow::StaticClass(), SelectionRowClass, UISettings->DefaultSelectionRowClass);
+			if (URageSelectionRow* SelectionRow = CreateWidget<URageSelectionRow>(this, RowClass))
+			{
+				SelectionRow->SetOptions(RageSettingsUI::BuildEnumOptionLabels(Property));
+				SelectionRow->ValueChangedDelegate.AddUObject(this, &URageSettingsRowGeneratorPanelBase::HandleGeneratedSelectionChanged);
+				Row = SelectionRow;
+			}
+			break;
+		}
+		default:
+			break;
+	}
+
+	if (!IsValid(Row))
+	{
+		return nullptr;
+	}
+
+	Row->SetLabel(RageSettingsUI::ResolveRowLabel(Property, Descriptor));
+	Row->SetRowId(Property->GetFName());
+
+	const FText Hint = RageSettingsUI::ResolveRowHint(Property, Descriptor);
+	if (!Hint.IsEmpty())
+	{
+		Row->SetHint(Hint);
+	}
+
+	const FText Description = RageSettingsUI::ResolveRowDescription(Property, Descriptor);
+	if (!Description.IsEmpty())
+	{
+		Row->SetDescription(Description);
+	}
+
+	TryOverrideObjectWidgetManipulation(Property, Row);
+
+	return Row;
+}
+
+void URageSettingsRowGeneratorPanelBase::AddSectionHeader(UPanelWidget* Container, const FText& Title, const int32 SectionIndex)
+{
+	const TSubclassOf<URageRowBaseUserWidget> HeaderClass = GetSectionWidgetClass();
+	if (Title.IsEmpty() || !HeaderClass)
+	{
+		return;
+	}
+
+	if (URageRowBaseUserWidget* Header = CreateWidget<URageRowBaseUserWidget>(this, HeaderClass))
+	{
+		Header->SetRowId(FName(TEXT("Section"), SectionIndex + 1));
+		Header->SetLabel(Title);
+		Container->AddChild(Header);
+	}
+}
+
+RageSettingsUI::ERowKind URageSettingsRowGeneratorPanelBase::ResolveKind(const FProperty* Property) const
+{
+	const RageSettingsUI::ERowKind Kind = RageSettingsUI::ResolveRowKind(Property);
+	if (Kind != RageSettingsUI::ERowKind::Combo && Kind != RageSettingsUI::ERowKind::Selection)
+	{
+		return Kind;
+	}
+
+	if (const TSubclassOf<URageRowBaseUserWidget>* Override = RowClassOverrides.Find(Property->GetFName()))
+	{
+		if (const UClass* OverrideClass = Override->Get())
+		{
+			if (OverrideClass->IsChildOf(URageComboRow::StaticClass()))
+			{
+				return RageSettingsUI::ERowKind::Combo;
+			}
+
+			if (OverrideClass->IsChildOf(URageSelectionRow::StaticClass()))
+			{
+				return RageSettingsUI::ERowKind::Selection;
+			}
+		}
+	}
+
+	return Kind;
+}
+
+UClass* URageSettingsRowGeneratorPanelBase::ResolveRowClass(const FProperty* Property, const UClass* ExpectedBase, UClass* PanelDefault, UClass* ProjectDefault) const
+{
+	auto Accept = [Property, ExpectedBase](const UClass* Candidate, const TCHAR* Source)
+	{
+		if (!Candidate)
+		{
+			return false;
+		}
+
+		if (Candidate->IsChildOf(ExpectedBase))
+		{
+			return true;
+		}
+
+		S_LOG(Warning, "Rage Settings : {source}[{property}] ({class}) doesn't derive from {base} - ignoring it.",
+			Source, *Property->GetName(), *Candidate->GetName(), *ExpectedBase->GetName());
+		return false;
+	};
+
+	if (const TSubclassOf<URageRowBaseUserWidget>* PanelOverride = RowClassOverrides.Find(Property->GetFName()))
+	{
+		if (Accept(PanelOverride->Get(), TEXT("RowClassOverrides")))
+		{
+			return PanelOverride->Get();
+		}
+	}
+
+	if (const FRageRowOverrideData* ProjectOverride = FindProjectOverride(Property))
+	{
+		if (Accept(ProjectOverride->WidgetClass, TEXT("RowWidgetClassOverrides")))
+		{
+			return ProjectOverride->WidgetClass;
+		}
+	}
+
+	return PanelDefault ? PanelDefault : ProjectDefault;
 }
 
 void URageSettingsRowGeneratorPanelBase::HandleGeneratedToggleChanged(FName RowId, FRageVariant bNewValue)

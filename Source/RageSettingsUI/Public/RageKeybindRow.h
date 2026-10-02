@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "Blueprint/UserWidget.h"
+#include "RageRowBaseUserWidget.h"
 #include "InputCoreTypes.h"
 #include "RageKeybindRow.generated.h"
 
@@ -14,65 +14,79 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FRageKeybindRowChanged, FName, Mapp
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FRageKeybindResetRequested, FName, MappingName);
 
 UCLASS(Abstract, meta=(DisableNativeTick))
-class RAGESETTINGSUI_API URageKeybindRow : public UUserWidget
+class RAGESETTINGSUI_API URageKeybindRow : public URageRowBaseUserWidget
 {
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintCallable, Category = "Rage|UI") 
+	UFUNCTION(BlueprintCallable, Category = "Rage|UI")
 	void Setup(FName InMappingName, const FText& NewLabel);
-	
-	UFUNCTION(BlueprintCallable, Category = "Rage|UI") 
+
+	UFUNCTION(BlueprintCallable, Category = "Rage|UI")
 	void SetCurrentKey(FKey NewKey);
-	
-	UFUNCTION(BlueprintPure, Category = "Rage|UI") 
+
+	UFUNCTION(BlueprintPure, Category = "Rage|UI")
+	FKey GetCurrentKey() const;
+
+	UFUNCTION(BlueprintPure, Category = "Rage|UI")
 	FName GetMappingName() const;
-	
-	UFUNCTION(BlueprintPure, Category = "Rage|UI") 
+
+	UFUNCTION(BlueprintPure, Category = "Rage|UI")
 	bool IsListeningForInput() const;
-	
+
+	/* Starts waiting for the next key, the same as clicking the key button. */
+	UFUNCTION(BlueprintCallable, Category = "Rage|UI")
+	void BeginListening();
+
+	/* Asks for the default key back, the same as clicking the reset button. */
+	UFUNCTION(BlueprintCallable, Category = "Rage|UI")
+	void RequestResetToDefault();
+
 	UFUNCTION(BlueprintImplementableEvent)
 	void OnKeyTextSet(const FText& NewKeyText);
-	
-	UFUNCTION(BlueprintImplementableEvent)
-	void OnLabelTextSet(const FText& NewLabelText);
 
-	UPROPERTY(BlueprintAssignable, Category = "Rage|Delegates") 
+	UPROPERTY(BlueprintAssignable, Category = "Rage|Delegates")
 	FRageKeybindRowChanged KeyRemappedDelegate;
-	
-	UPROPERTY(BlueprintAssignable, Category = "Rage|Delegates") 
+
+	UPROPERTY(BlueprintAssignable, Category = "Rage|Delegates")
 	FRageKeybindResetRequested ResetToDefaultRequestedDelegate;
 
 protected:
 	virtual void NativeConstruct() override;
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
-	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply NativeOnPreviewMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 	virtual void NativeOnFocusLost(const FFocusEvent& InFocusEvent) override;
-	
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidget)) 
-	TObjectPtr<UTextBlock> Label = nullptr;
-	
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidget)) 
+
+	virtual FString GetValueKey() const override;
+	virtual FText GetValueText() const override;
+
+	/* Listening started or stopped, for a subclass to swap the key cap for a prompt. */
+	virtual void NativeOnListeningChanged(bool bListening);
+
+	/* The key cap's text: the bound key's name, or the unbound or listening prompt. */
+	virtual void NativeOnKeyTextChanged(const FText& NewKeyText);
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UButton> RemapButton = nullptr;
-	
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidget)) 
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> KeyText = nullptr;
-	
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional)) 
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UButton> ResetButton = nullptr;
 
 private:
-	UFUNCTION() 
+	UFUNCTION()
 	void HandleRemapButtonClicked();
-	
-	UFUNCTION() 
+
+	UFUNCTION()
 	void HandleResetButtonClicked();
-	
-	void BeginListening();
+
 	void EndListening(bool bCancelled);
 	void SetButtonsEnabled(bool bEnabled);
 	void TryCommitKey(FKey NewKey);
-	
+	void ShowKeyText(const FText& NewKeyText);
+
 	FName MappingName = NAME_None;
 	FKey CurrentKey = FKey();
 	bool bListeningForInput = false;

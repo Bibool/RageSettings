@@ -42,8 +42,21 @@ protected:
 	void RefreshSelection();
 	virtual void RefreshSelection_Implementation();
 
+	virtual FString GetValueKey() const override;
+	virtual FText GetValueText() const override;
+
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> ValueText = nullptr;
+
+	/* For a subclass drawing the value with something other than ValueText. */
+	const TArray<FText>& GetOptions() const;
+
+	/** +1 or -1 while RefreshSelection runs for a step through the arrows, 0 when the index was set directly
+	 * or by a pip. Wrapping makes the direction impossible to recover from the two indices alone. */
+	int8 GetStepDirection() const;
+
+	UButton* GetLeftButton() const;
+	UButton* GetRightButton() const;
 
 private:
 	UFUNCTION()
@@ -69,5 +82,7 @@ private:
 	TArray<FText> Options;
 
 	int32 SelectedIndex = INDEX_NONE;
+
+	int8 StepDirection = 0;
 
 };
