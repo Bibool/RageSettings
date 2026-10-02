@@ -24,6 +24,9 @@ struct FRageRowOverrideData
 	/* The short line under the label. Without one, a string table entry keyed <Property>_Hint is used. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(EditCondition="bCreateWidget", EditConditionHides))
 	FText DesiredHint = FText::GetEmpty();
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(EditCondition="bCreateWidget", EditConditionHides))
+	TSoftObjectPtr<UTexture2D> DesiredPreviewImage = nullptr;
 
 	/* What a details pane says about the row. Without one, a string table entry keyed <Property>_Description is used. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(EditCondition="bCreateWidget", EditConditionHides, MultiLine="true"))

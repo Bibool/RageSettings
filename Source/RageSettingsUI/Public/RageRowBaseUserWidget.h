@@ -77,6 +77,9 @@ public:
 	/* The current value as the player reads it: ON, 95%, HIGH, SPACE. */
 	UFUNCTION(BlueprintPure, Category = "Rage|UI")
 	FText GetValueDisplayText() const;
+	
+	UFUNCTION(BlueprintPure, Category = "Rage|UI")
+	TSoftObjectPtr<UTexture2D> GetPreviewImage() const;
 
 	/* The baseline value as the player read it when it was taken. */
 	UFUNCTION(BlueprintPure, Category = "Rage|UI")

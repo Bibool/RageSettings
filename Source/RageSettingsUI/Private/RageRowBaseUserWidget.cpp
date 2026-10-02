@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "RageRowBaseUserWidget.h"
+#include "RageSettingsUIDeveloperSettings.h"
 
 #include "Components/TextBlock.h"
 
@@ -90,6 +91,16 @@ bool URageRowBaseUserWidget::IsSettingRow() const
 FText URageRowBaseUserWidget::GetValueDisplayText() const
 {
 	return GetValueText();
+}
+
+TSoftObjectPtr<UTexture2D> URageRowBaseUserWidget::GetPreviewImage() const
+{
+	if (const FRageRowOverrideData* OverrideData = SETTINGS_UI->RowWidgetClassOverrides.Find(GetRowId()))
+	{
+		return OverrideData->DesiredPreviewImage;
+	}
+	
+	return nullptr;
 }
 
 FText URageRowBaseUserWidget::GetBaselineDisplayText() const
