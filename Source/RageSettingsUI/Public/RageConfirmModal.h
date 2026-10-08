@@ -23,7 +23,7 @@ class RAGESETTINGSUI_API URageConfirmModal : public URageModalBase
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "Rage|UI")
-	void ChooseConfirm();
+	virtual void ChooseConfirm();
 
 	UFUNCTION(BlueprintCallable, Category = "Rage|UI")
 	void ChooseAlternate();
